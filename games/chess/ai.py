@@ -1,5 +1,7 @@
 # This is where you build your AI for the Chess game.
 
+# NAME: Anton Strickland
+
 from joueur.base_ai import BaseAI
 import random
 
