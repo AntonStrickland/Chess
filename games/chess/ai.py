@@ -16,7 +16,7 @@ class AI(BaseAI):
             str: The name of your Player.
         """
 
-        return "Chess Python Player" # REPLACE THIS WITH YOUR TEAM NAME
+        return "Seacats" # REPLACE THIS WITH YOUR TEAM NAME
 
 
 
@@ -48,7 +48,30 @@ class AI(BaseAI):
 
         # replace with your end logic
 
-
+    def CheckValidPawnMove(self, newFile, newRank):
+      # Check to see if there is another of our pieces already at this position
+      print("Checking " + str(newFile) + str(newRank))
+      for piece in self.game.pieces:
+        # print(piece.file, piece.rank)
+        if piece.file == newFile and piece.rank == newRank:
+          return False
+      return True
+      
+    def GetRandomPawn(self):
+      pawns = []
+      for piece in self.player.pieces:
+        if piece.type == "Pawn":
+          pawns.append(piece)    
+      return random.choice(pawns)
+      
+    def MovePawnUpOneRank(self, pawn):
+      validMove = False
+      while(validMove is False):
+        newFile = pawn.file
+        newRank = pawn.rank+self.player.rank_direction
+        validMove = self.CheckValidPawnMove(newFile, newRank)
+      pawn.move(newFile, newRank)
+      return
 
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
@@ -79,7 +102,7 @@ class AI(BaseAI):
                     r = chr(ord("a") + rankOffset) # start at a, with with rank offset increasing the char
                     currentPiece = None
                     for piece in self.game.pieces:
-                        if piece.rank == r and piece.file == f: # then we found the piece at (rank, file)
+                        if piece.file == r and piece.rank == f: # then we found the piece at (rank, file)
                             currentPiece = piece
                             break
 
@@ -106,10 +129,10 @@ class AI(BaseAI):
         # 3) print how much time remaining this AI has to calculate moves
         print("Time Remaining: " + str(self.player.time_remaining) + " ns")
 
-        # 4) make a random (and probably invalid) move.
-        randomPiece = random.choice(self.player.pieces)
-        randomRank = chr(ord("a") + random.randrange(8))
-        randomFile = random.randrange(8) + 1
-        randomPiece.move(randomRank, randomFile)
+        # 4) Make a Move
+        
+        randomPawn = self.GetRandomPawn()
+        self.MovePawnUpOneRank(randomPawn)
 
+        print("End of my turn.")
         return True # to signify we are done with our turn.
