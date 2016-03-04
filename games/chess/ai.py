@@ -75,6 +75,33 @@ class AI(BaseAI):
       # Move the pawn.
       pawn.move(newFile, newRank)
       return True
+      
+    def MovePawnUpTwoRanks(self, pawn):
+    
+      # Make sure we are moving a pawn.
+      if pawn.type != "Pawn":
+        return False
+        
+      # Make sure we only do this on the initial rank
+      if pawn.rank != 2:
+        return False
+        
+      # Make sure we do not move the pawn through an occupied space.
+      newFile = pawn.file
+      newRank = pawn.rank+self.player.rank_direction
+      for piece in self.game.pieces:
+        if piece.file == newFile and piece.rank == newRank:
+          return False
+      
+      # Make sure we do not move the pawn into an occupied space.
+      newRank = newRank+self.player.rank_direction
+      for piece in self.game.pieces:
+        if piece.file == newFile and piece.rank == newRank:
+          return False
+          
+      # Move the pawn.
+      pawn.move(newFile, newRank)
+      return True
 
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
@@ -141,7 +168,7 @@ class AI(BaseAI):
           if theMove == 0:
             validMove = self.MovePawnUpOneRank(thePiece)
           if theMove == 1:
-            validMove = self.MovePawnUpOneRank(thePiece)
+            validMove = self.MovePawnUpTwoRanks(thePiece)
 
         print("End of my turn.")
         return True # to signify we are done with our turn.
