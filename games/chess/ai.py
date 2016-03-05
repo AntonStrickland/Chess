@@ -152,7 +152,20 @@ class AI(BaseAI):
           newMoves.append(newMove)
           currentFile = newMove[0]
           currentRank = newMove[1]
-          print(newMove)
+        else:
+          encounteredPiece = True
+      return newMoves
+    
+    def MoveListDiagonal(self, piece, newMoves, step1, step2):
+      currentFile = piece.file
+      currentRank = piece.rank
+      encounteredPiece = False
+      while(encounteredPiece is False):
+        newMove = (self.ChangeFile(currentFile, step1), self.ChangeRank(currentRank, step2))
+        if self.CheckValidSpace(newMove[0], newMove[1]):
+          newMoves.append(newMove)
+          currentFile = newMove[0]
+          currentRank = newMove[1]
         else:
           encounteredPiece = True
       return newMoves
@@ -189,6 +202,34 @@ class AI(BaseAI):
       return True, newFile, newRank
       
 
+    def MoveBishopDiagonally(self, bishop, newFile, newRank):
+    
+      # Make sure we are moving a knight.
+      if bishop.type != "Bishop":
+        return False, None, None
+        
+      newBishopMoves = []
+      
+      print("Moving bishop...")
+      
+      # Generate all the possible Rook moves
+      newBishopMoves = self.MoveListDiagonal(bishop, newBishopMoves, 1, 1)
+      newBishopMoves = self.MoveListDiagonal(bishop, newBishopMoves, 1, -1)
+      newBishopMoves = self.MoveListDiagonal(bishop, newBishopMoves, -1, 1)
+      newBishopMoves = self.MoveListDiagonal(bishop, newBishopMoves, -1, -1)
+      
+      # If no moves can be made, return False
+      if (len(newBishopMoves) <= 0):
+        return False, None, None
+        
+      print("Final Moves:")
+      print(newBishopMoves)
+
+      # Pick a random valid move
+      newMove = random.choice(newBishopMoves)
+      newFile, newRank = newMove[0], newMove[1]
+
+      return True, newFile, newRank
       
     def MoveKnightUpTwoOverOne(self, knight, newFile, newRank):
   
@@ -319,7 +360,7 @@ class AI(BaseAI):
         newFile = None
         while(validMove is False):
           thePiece = random.choice(self.player.pieces)
-          theMove = random.randint(0,3)
+          theMove = random.randint(0,4)
           # print("Thinking...")
           if theMove == 0:
             validMove, newFile, newRank = self.MovePawnUpOneRank(thePiece, newFile, newRank)
