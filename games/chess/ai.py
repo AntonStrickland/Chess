@@ -202,6 +202,40 @@ class AI(BaseAI):
       return True, newFile, newRank
       
 
+    def MoveQueen(self, queen, newFile, newRank):
+    
+      # Make sure we are moving a knight.
+      if queen.type != "Queen":
+        return False, None, None
+        
+      newQueenMoves = []
+      
+      print("Moving queen...")
+      
+      # Generate all the possible Rook moves
+      newQueenMoves = self.MoveListCardinal(queen, newQueenMoves, 1, 'h')
+      newQueenMoves = self.MoveListCardinal(queen, newQueenMoves, -1, 'h')
+      newQueenMoves = self.MoveListCardinal(queen, newQueenMoves, 1, 'v')
+      newQueenMoves = self.MoveListCardinal(queen, newQueenMoves, -1, 'v')
+      newQueenMoves = self.MoveListDiagonal(queen, newQueenMoves, 1, 1)
+      newQueenMoves = self.MoveListDiagonal(queen, newQueenMoves, 1, -1)
+      newQueenMoves = self.MoveListDiagonal(queen, newQueenMoves, -1, 1)
+      newQueenMoves = self.MoveListDiagonal(queen, newQueenMoves, -1, -1)
+      
+      # If no moves can be made, return False
+      if (len(newQueenMoves) <= 0):
+        return False, None, None
+        
+      print("Final Moves:")
+      print(newQueenMoves)
+
+      # Pick a random valid move
+      newMove = random.choice(newQueenMoves)
+      newFile, newRank = newMove[0], newMove[1]
+
+      return True, newFile, newRank
+      
+      
     def MoveBishopDiagonally(self, bishop, newFile, newRank):
     
       # Make sure we are moving a knight.
@@ -231,6 +265,7 @@ class AI(BaseAI):
 
       return True, newFile, newRank
       
+      
     def MoveKnightUpTwoOverOne(self, knight, newFile, newRank):
   
       # directions1 = [(-1,0), (1,0)] # left, right
@@ -243,40 +278,13 @@ class AI(BaseAI):
       newKnightMoves = []
       
       # Generate all the possible Knight moves
+        
+      knightMoves = [ (2,-1), (2, 1), (-2, -1), (-2, 1), (1, -2), (-1, -2), (1, 2), (-1, 2) ]
       
-      # 2 right, 1 down
-      newMove = (self.ChangeFile(knight.file, 2), self.ChangeRank(knight.rank, -1))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 right, 1 up
-      newMove = (self.ChangeFile(knight.file, 2), self.ChangeRank(knight.rank, 1))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 left, 1 down
-      newMove = (self.ChangeFile(knight.file, -2), self.ChangeRank(knight.rank, -1))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 left, 1 up
-      newMove = (self.ChangeFile(knight.file, -2), self.ChangeRank(knight.rank, 1))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      
-      # 2 down, 1 right
-      newMove = (self.ChangeFile(knight.file, 1), self.ChangeRank(knight.rank, -2))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 down, 1 left
-      newMove = (self.ChangeFile(knight.file, -1), self.ChangeRank(knight.rank, -2))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 up, 1 right
-      newMove = (self.ChangeFile(knight.file, 1), self.ChangeRank(knight.rank, 2))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
-      # 2 up, 1 left
-      newMove = (self.ChangeFile(knight.file, -1), self.ChangeRank(knight.rank, 2))
-      if newMove[0] is not None and newMove[1] is not None and self.CheckValidSpace(newMove[0], newMove[1]) is True:
-        newKnightMoves.append(newMove)
+      for move in knightMoves:
+        newMove = (self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]))
+        if self.CheckValidSpace(newMove[0], newMove[1]) is True:
+          newKnightMoves.append(newMove)
       
       print(newKnightMoves)
       
@@ -290,6 +298,45 @@ class AI(BaseAI):
 
       # Pick a random valid move
       newMove = random.choice(newKnightMoves)
+      newFile, newRank = newMove[0], newMove[1]
+      
+      # Move the knight.
+      # knight.move(newFile, newRank)
+
+      return True, newFile, newRank
+      
+    def MoveKing(self, king, newFile, newRank):
+  
+      # directions1 = [(-1,0), (1,0)] # left, right
+      # directions2 = [(0,1), (0,-1)] # up, down
+      
+      # Make sure we are moving a knight.
+      if king.type != "King":
+        return False, None, None
+        
+      newKingMoves = []
+      
+      # Generate all the possible King moves
+        
+      kingMoves = [ (0,1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
+      
+      for move in kingMoves:
+        newMove = (self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]))
+        if self.CheckValidSpace(newMove[0], newMove[1]) is True:
+          newKingMoves.append(newMove)
+      
+      print(newKingMoves)
+      
+      # If no moves can be made, return False
+      if (len(newKingMoves) <= 0):
+        return False, None, None
+        
+
+      print("Final Moves:")
+      print(newKingMoves)
+
+      # Pick a random valid move
+      newMove = random.choice(newKingMoves)
       newFile, newRank = newMove[0], newMove[1]
       
       # Move the knight.
@@ -360,7 +407,7 @@ class AI(BaseAI):
         newFile = None
         while(validMove is False):
           thePiece = random.choice(self.player.pieces)
-          theMove = random.randint(0,4)
+          theMove = random.randint(0,6)
           # print("Thinking...")
           if theMove == 0:
             validMove, newFile, newRank = self.MovePawnUpOneRank(thePiece, newFile, newRank)
@@ -372,6 +419,10 @@ class AI(BaseAI):
             validMove, newFile, newRank = self.MoveRookCardinally(thePiece, newFile, newRank)
           if theMove == 4:
             validMove, newFile, newRank = self.MoveBishopDiagonally(thePiece, newFile, newRank)
+          if theMove == 5:
+            validMove, newFile, newRank = self.MoveQueen(thePiece, newFile, newRank)
+          if theMove == 6:
+            validMove, newFile, newRank = self.MoveKing(thePiece, newFile, newRank)
         thePiece.move(newFile, newRank)
         print("Moved to: " + str(newFile) + str(newRank))
         print("End of my turn.")
