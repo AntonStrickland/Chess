@@ -134,38 +134,25 @@ class AI(BaseAI):
       # Make sure we do not move the piece into an occupied space.
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-          if piece.owner == self.player:
             return False
-          else:
-            return True
       return True
       
       
-    def MoveListHorizontal(self, piece, newMoves=[], step=1):
+    def MoveListCardinal(self, piece, newMoves, step, direction):
       currentFile = piece.file
       currentRank = piece.rank
       encounteredPiece = False
       while(encounteredPiece is False):
-        newMove = (self.ChangeFile(currentFile, step), currentRank)
+        newMove = None
+        if direction == 'h':
+          newMove = (self.ChangeFile(currentFile, step), currentRank)
+        else:
+          newMove = (currentFile, self.ChangeRank(currentRank, step))
         if self.CheckValidSpace(newMove[0], newMove[1]):
           newMoves.append(newMove)
           currentFile = newMove[0]
           currentRank = newMove[1]
           print(newMove)
-        else:
-          encounteredPiece = True
-      return newMoves
-
-    def MoveListVertical(self, piece, newMoves=[], step=1):
-      currentFile = piece.file
-      currentRank = piece.rank
-      encounteredPiece = False
-      while(encounteredPiece is False):
-        newMove = (currentFile, self.ChangeRank(currentRank, step))
-        if self.CheckValidSpace(newMove[0], newMove[1]):
-          newMoves.append(newMove)
-          currentFile = newMove[0]
-          currentRank = newMove[1]
         else:
           encounteredPiece = True
       return newMoves
@@ -182,10 +169,10 @@ class AI(BaseAI):
       print("Moving rook...")
       
       # Generate all the possible Rook moves
-      newRookMoves = self.MoveListHorizontal(rook, newRookMoves, 1)
-      newRookMoves = self.MoveListHorizontal(rook, newRookMoves, -1)
-      newRookMoves = self.MoveListVertical(rook, newRookMoves, 1)
-      newRookMoves = self.MoveListVertical(rook, newRookMoves, -1)
+      newRookMoves = self.MoveListCardinal(rook, newRookMoves, 1, 'h')
+      newRookMoves = self.MoveListCardinal(rook, newRookMoves, -1, 'h')
+      newRookMoves = self.MoveListCardinal(rook, newRookMoves, 1, 'v')
+      newRookMoves = self.MoveListCardinal(rook, newRookMoves, -1, 'v')
       
       # If no moves can be made, return False
       if (len(newRookMoves) <= 0):
