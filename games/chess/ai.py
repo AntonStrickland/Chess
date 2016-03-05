@@ -46,13 +46,12 @@ class AI(BaseAI):
         """
 
         # replace with your end logic
-
-    def CheckValidPawnMove(self, newFile, newRank):
-      # Check to see if there is another of our pieces already at this position
-      print("Checking " + str(newFile) + str(newRank))
-      
-      return True
-      
+    
+    
+    def InCheck(self):
+      print("...")
+    
+    
     def GetRandomPawn(self):
       pawns = []
       for piece in self.player.pieces:
@@ -60,49 +59,47 @@ class AI(BaseAI):
           pawns.append(piece)    
       return random.choice(pawns)
       
-    def MovePawnUpOneRank(self, pawn):
+      
+    def MovePawnUpOneRank(self, pawn, newFile, newRank):
     
+      
       # Make sure we are moving a pawn.
       if pawn.type != "Pawn":
-        return False
+        return False, None, None
         
       # Make sure we do not move the pawn into an occupied space.
       newFile = pawn.file
       newRank = pawn.rank+self.player.rank_direction
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-          return False
+          return False, None, None
       
-      # Move the pawn.
-      pawn.move(newFile, newRank)
-      return True
+      return True, newFile, newRank 
       
-    def MovePawnUpTwoRanks(self, pawn):
+    def MovePawnUpTwoRanks(self, pawn, newFile, newRank):
     
       # Make sure we are moving a pawn.
       if pawn.type != "Pawn":
-        return False
+        return False, None, None
         
       # Make sure we only do this on the initial rank
       if pawn.rank != 2:
-        return False
+        return False, None, None
         
       # Make sure we do not move the pawn through an occupied space.
       newFile = pawn.file
       newRank = pawn.rank+self.player.rank_direction
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-          return False
+          return False, None, None
       
       # Make sure we do not move the pawn into an occupied space.
       newRank = newRank+self.player.rank_direction
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-          return False
+          return False, None, None
           
-      # Move the pawn.
-      pawn.move(newFile, newRank)
-      return True
+      return True, newFile, newRank
       
     def ChangeFile(self, oldFile, diff):
       files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -129,20 +126,91 @@ class AI(BaseAI):
         return None
     
     def CheckValidSpace(self, newFile, newRank):
+    
+      # If the space is out of bounds, return False
+      if newFile is None or newRank is None:
+        return False
+    
       # Make sure we do not move the piece into an occupied space.
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-          return False
+          if piece.owner == self.player:
+            return False
+          else:
+            return True
       return True
+      
+      
+    def MoveListHorizontal(self, piece, newMoves=[], step=1):
+      currentFile = piece.file
+      currentRank = piece.rank
+      encounteredPiece = False
+      while(encounteredPiece is False):
+        newMove = (self.ChangeFile(currentFile, step), currentRank)
+        if self.CheckValidSpace(newMove[0], newMove[1]):
+          newMoves.append(newMove)
+          currentFile = newMove[0]
+          currentRank = newMove[1]
+          print(newMove)
+        else:
+          encounteredPiece = True
+      return newMoves
+
+    def MoveListVertical(self, piece, newMoves=[], step=1):
+      currentFile = piece.file
+      currentRank = piece.rank
+      encounteredPiece = False
+      while(encounteredPiece is False):
+        newMove = (currentFile, self.ChangeRank(currentRank, step))
+        if self.CheckValidSpace(newMove[0], newMove[1]):
+          newMoves.append(newMove)
+          currentFile = newMove[0]
+          currentRank = newMove[1]
+        else:
+          encounteredPiece = True
+      return newMoves
     
-    def MoveKnightUpTwoOverOne(self, knight, dir1=None, dir2=None):
+    def MoveRookCardinally(self, rook, newFile, newRank):
+    
+      
+      # Make sure we are moving a knight.
+      if rook.type != "Rook":
+        return False, None, None
+        
+      newRookMoves = []
+      
+      print("Moving rook...")
+      
+      # Generate all the possible Rook moves
+      newRookMoves = self.MoveListHorizontal(rook, newRookMoves, 1)
+      newRookMoves = self.MoveListHorizontal(rook, newRookMoves, -1)
+      newRookMoves = self.MoveListVertical(rook, newRookMoves, 1)
+      newRookMoves = self.MoveListVertical(rook, newRookMoves, -1)
+      
+      # If no moves can be made, return False
+      if (len(newRookMoves) <= 0):
+        return False, None, None
+        
+
+      print("Final Moves:")
+      print(newRookMoves)
+
+      # Pick a random valid move
+      newMove = random.choice(newRookMoves)
+      newFile, newRank = newMove[0], newMove[1]
+
+      return True, newFile, newRank
+      
+
+      
+    def MoveKnightUpTwoOverOne(self, knight, newFile, newRank):
   
-      directions1 = [(-1,0), (1,0)] # left, right
-      directions2 = [(0,1), (0,-1)] # up, down
+      # directions1 = [(-1,0), (1,0)] # left, right
+      # directions2 = [(0,1), (0,-1)] # up, down
       
       # Make sure we are moving a knight.
       if knight.type != "Knight":
-        return False
+        return False, None, None
         
       newKnightMoves = []
       
@@ -183,22 +251,23 @@ class AI(BaseAI):
         newKnightMoves.append(newMove)
       
       print(newKnightMoves)
-          
+      
       # If no moves can be made, return False
       if (len(newKnightMoves) <= 0):
-        return False
-     
+        return False, None, None
+        
+
       print("Final Moves:")
       print(newKnightMoves)
+
       # Pick a random valid move
       newMove = random.choice(newKnightMoves)
       newFile, newRank = newMove[0], newMove[1]
       
       # Move the knight.
-      knight.move(newFile, newRank)
-      print("Moved to: " + str(newFile) + str(newRank))
-      
-      return True
+      # knight.move(newFile, newRank)
+
+      return True, newFile, newRank
 
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
@@ -259,15 +328,23 @@ class AI(BaseAI):
         # 4) Make a Random Valid Move
         
         validMove = False
+        newRank = None
+        newFile = None
         while(validMove is False):
           thePiece = random.choice(self.player.pieces)
-          theMove = 2 # random.randint(0,2)
+          theMove = random.randint(0,3)
+          # print("Thinking...")
           if theMove == 0:
-            validMove = self.MovePawnUpOneRank(thePiece)
+            validMove, newFile, newRank = self.MovePawnUpOneRank(thePiece, newFile, newRank)
           if theMove == 1:
-            validMove = self.MovePawnUpTwoRanks(thePiece)
+            validMove, newFile, newRank = self.MovePawnUpTwoRanks(thePiece, newFile, newRank)
           if theMove == 2:
-            validMove = self.MoveKnightUpTwoOverOne(thePiece)
-
+            validMove, newFile, newRank = self.MoveKnightUpTwoOverOne(thePiece, newFile, newRank)
+          if theMove == 3:
+            validMove, newFile, newRank = self.MoveRookCardinally(thePiece, newFile, newRank)
+          if theMove == 4:
+            validMove, newFile, newRank = self.MoveBishopDiagonally(thePiece, newFile, newRank)
+        thePiece.move(newFile, newRank)
+        print("Moved to: " + str(newFile) + str(newRank))
         print("End of my turn.")
         return True # to signify we are done with our turn.
