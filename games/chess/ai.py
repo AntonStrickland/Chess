@@ -36,7 +36,24 @@ class State():
             output += "|"
         print(output)
         
-        
+class Action():
+  __slots__ = ['to', 'frm', 'piece', 'func']
+  
+  def __init__(self, newFile, newRank, piece, func=None):
+    self.to = (newFile, newRank)
+    self.frm = (piece.file, piece.rank)
+    self.piece = piece
+    self.func = func
+    
+  def __str__(self):
+    return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
+    
+  def __repr__(self):
+    if self.func is not None:
+      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to) + ": " + str(self.func)
+    else:
+      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
+    
 class AI(BaseAI):
     """ The basic AI functions that are the same between games. """
 
@@ -61,12 +78,19 @@ class AI(BaseAI):
         self.QUEEN = "Queen"
         self.KING = "King"
         
-        self.TheirMoveList = []
-        self.enableCheckValidation = True
+        self.currentBoard = []
+        
+        for i in range(0,8):
+          self.currentBoard.append([])
+          for j in range(0,8):
+            self.currentBoard[i].append('.')
         
         self.files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
         self.knightMoves = [ (2,-1), (2, 1), (-2, -1), (-2, 1), (1, -2), (-1, -2), (1, 2), (-1, 2) ]
         self.kingMoves = [ (0,1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1) ]
+        self.rookMoves = [(1,'h'), (-1, 'h'), (1,'v'), (-1,'v')]
+        self.bishopMoves = [(1,1), (1,-1), (-1,1), (-1,-1)]
+      
         self.pieceNames = [self.PAWN, self.KNIGHT, self.BISHOP, self.ROOK, self.QUEEN, self.KING]
         
         self.generatorDict = { 
@@ -98,27 +122,23 @@ class AI(BaseAI):
 
         # replace with your end logic
  
-    def GeneratePawnMoves(self, pawn, theMoveList):
-      theMoveList = self.MovePawnUpOneRank(pawn, theMoveList)
-      theMoveList = self.MovePawnUpTwoRanks(pawn, theMoveList)
-      theMoveList = self.CaptureWithPawn(pawn, theMoveList, 'l')
-      theMoveList = self.CaptureWithPawn(pawn, theMoveList, 'r')
-      return theMoveList
-      
+
+    def CheckIfInCheck(self, action):
+      king = self.pieceDict[self.KING][self.player.id][0]
+      if action.to[0] == king.file and action.to[1] == king.rank:
+        self.willBeInCheck = True
+                
     def CaptureWithPawn(self, pawn, theMoveList, direction):
     
       # Generate new rank and new file
       newRank = self.ChangeRank(pawn.rank, 1)
-      if direction == 'l':
-        newFile = self.ChangeFile(pawn.file, -1)
-      else:
-        newFile = self.ChangeFile(pawn.file, 1)
-      
+      newFile = self.ChangeFile(pawn.file, direction)
+
       # If there is an enemy piece at that space, this is a valid move
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank and piece.owner != self.player:
-          theMoveList.append( (newFile, newRank, pawn) )
-      
+          theMoveList.append( Action(newFile, newRank, pawn, "Capture") )
+          
       return theMoveList
       
     def MovePawnUpOneRank(self, pawn, theMoveList):
@@ -130,7 +150,11 @@ class AI(BaseAI):
         if piece.file == newFile and piece.rank == newRank:
           return theMoveList
       
-      theMoveList.append( (newFile, newRank, pawn) )
+      validity = self.CheckValidSpace(newFile, newRank, pawn)
+      if validity == "Valid":
+        theMoveList.append( Action(newFile, newRank, pawn, "up one") )
+        #print(str(self.player.id) + " moved from " + str(pawn.file) + str(pawn.rank) + " to " + str(newFile) + str(newRank))
+      
       return theMoveList
       
     def MovePawnUpTwoRanks(self, pawn, theMoveList):
@@ -152,7 +176,11 @@ class AI(BaseAI):
         if piece.file == newFile and piece.rank == newRank:
           return theMoveList
       
-      theMoveList.append( (newFile, newRank, pawn) )
+      validity = self.CheckValidSpace(newFile, newRank, pawn)
+      if validity == "Valid":
+        theMoveList.append( Action(newFile, newRank, pawn, "up two") )
+        # print(str(self.player.id) + "moved from " + str(pawn.file) + str(pawn.rank) + " to " + str(newFile) + str(newRank))
+      
       return theMoveList
       
     def GetFileIndex(self, oldFile):
@@ -174,6 +202,7 @@ class AI(BaseAI):
     def ChangeRank(self, oldRank, diff):
       if oldRank is None:
         return None
+      
       newRank = oldRank + (self.player.rank_direction * diff)
       if newRank > 0 and newRank < 9:
         return newRank
@@ -196,13 +225,8 @@ class AI(BaseAI):
             return validType
           else:
             validType = "Opponent"
-
-      if self.enableCheckValidation == True:
-        self.TheirMoveList = self.GenerateAllValidMoves(self.player.other_player.id)
-        king = self.pieceDict[self.KING][self.player.id][0]
-        for theirMove in self.TheirMoveList:
-          if theirMove[0] == king.file and theirMove[1] == king.rank:
-            return "Invalid"
+            if piece.type == "King":
+              print("Check! " + str(movingPiece.type) + str(newFile) + str(newRank))
          
       return validType
     
@@ -215,16 +239,16 @@ class AI(BaseAI):
       while(encounteredPiece is False):
 
         if direction == 'h':
-          newMove = (self.ChangeFile(currentFile, step), currentRank, piece)
+          newMove = Action(self.ChangeFile(currentFile, step), currentRank, piece)
         else:
-          newMove = (currentFile, self.ChangeRank(currentRank, step), piece)
+          newMove = Action(currentFile, self.ChangeRank(currentRank, step), piece)
           
-        validity = self.CheckValidSpace(newMove[0], newMove[1], piece)
+        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
         
         if validity == "Valid":
           newMoves.append(newMove)
-          currentFile = newMove[0]
-          currentRank = newMove[1]
+          currentFile = newMove.to[0]
+          currentRank = newMove.to[1]
         elif validity == "Opponent":
           newMoves.append(newMove)
           encounteredPiece = True
@@ -239,15 +263,13 @@ class AI(BaseAI):
       encounteredPiece = False
       
       while(encounteredPiece is False):
-        newMove = (self.ChangeFile(currentFile, step1), self.ChangeRank(currentRank, step2), piece)
-        validity = self.CheckValidSpace(newMove[0], newMove[1], piece)
+        newMove = Action(self.ChangeFile(currentFile, step1), self.ChangeRank(currentRank, step2), piece)
+        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
        
         if validity == "Valid":
-          if newMove[1] < 0:
-            print(newMove[1])
           newMoves.append(newMove)
-          currentFile = newMove[0]
-          currentRank = newMove[1]
+          currentFile = newMove.to[0]
+          currentRank = newMove.to[1]
         elif validity == "Opponent":
           newMoves.append(newMove)
           encounteredPiece = True
@@ -255,72 +277,65 @@ class AI(BaseAI):
           encounteredPiece = True
           
       return newMoves
-    
-    def GenerateRookMoves(self, rook, theMoveList):
-
-      # Generate all the possible Rook moves
-      theMoveList = self.MoveListCardinal(rook, theMoveList, 1, 'h')
-      theMoveList = self.MoveListCardinal(rook, theMoveList, -1, 'h')
-      theMoveList = self.MoveListCardinal(rook, theMoveList, 1, 'v')
-      theMoveList = self.MoveListCardinal(rook, theMoveList, -1, 'v')
-
-      return theMoveList
-     
-    def GenerateQueenMoves(self, queen, theMoveList):
-
-      # Generate all the possible Queen moves
-      theMoveList = self.MoveListCardinal(queen, theMoveList, 1, 'h')
-      theMoveList = self.MoveListCardinal(queen, theMoveList, -1, 'h')
-      theMoveList = self.MoveListCardinal(queen, theMoveList, 1, 'v')
-      theMoveList = self.MoveListCardinal(queen, theMoveList, -1, 'v')
-      theMoveList = self.MoveListDiagonal(queen, theMoveList, 1, 1)
-      theMoveList = self.MoveListDiagonal(queen, theMoveList, 1, -1)
-      theMoveList = self.MoveListDiagonal(queen, theMoveList, -1, 1)
-      theMoveList = self.MoveListDiagonal(queen, theMoveList, -1, -1)
-
-      return theMoveList
       
-    def GenerateBishopMoves(self, bishop, theMoveList):
-      
-      # Generate all the possible Bishop moves
-      theMoveList = self.MoveListDiagonal(bishop, theMoveList, 1, 1)
-      theMoveList = self.MoveListDiagonal(bishop, theMoveList, 1, -1)
-      theMoveList = self.MoveListDiagonal(bishop, theMoveList, -1, 1)
-      theMoveList = self.MoveListDiagonal(bishop, theMoveList, -1, -1)
-
+    def GeneratePawnMoves(self, pawn, theMoveList):
+      theMoveList = self.MovePawnUpOneRank(pawn, theMoveList)
+      theMoveList = self.MovePawnUpTwoRanks(pawn, theMoveList)
+      theMoveList = self.CaptureWithPawn(pawn, theMoveList, -1)
+      theMoveList = self.CaptureWithPawn(pawn, theMoveList, 1)
       return theMoveList
       
     def GenerateKnightMoves(self, knight, theMoveList):
-
       # Generate all the possible Knight moves
       for move in self.knightMoves:
-        newMove = (self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]), knight)
-        validity = self.CheckValidSpace(newMove[0], newMove[1], knight)
+        newMove = Action(self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]), knight)
+        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], knight)
         if validity == "Valid" or validity == "Opponent":
           theMoveList.append(newMove)
 
+      return theMoveList
+    
+    def GenerateBishopMoves(self, bishop, theMoveList):
+      # Generate all the possible Bishop moves
+      for move in self.bishopMoves:
+        theMoveList = self.MoveListDiagonal(bishop, theMoveList, move[0], move[1])
+      return theMoveList
+      
+    def GenerateRookMoves(self, rook, theMoveList):
+      # Generate all the possible Rook moves
+      for move in self.rookMoves:
+        theMoveList = self.MoveListCardinal(rook, theMoveList, move[0], move[1])
+      return theMoveList
+     
+    def GenerateQueenMoves(self, queen, theMoveList):
+      # Generate all the possible Queen moves
+      for move in self.rookMoves:
+        theMoveList = self.MoveListCardinal(queen, theMoveList, move[0], move[1])
+      for move in self.bishopMoves:
+        theMoveList = self.MoveListDiagonal(queen, theMoveList, move[0], move[1])
       return theMoveList
       
     def GenerateKingMoves(self, king, theMoveList):
       
       # Generate all the possible King moves
       for move in self.kingMoves:
-        newMove = (self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]), king)
-        validity = self.CheckValidSpace(newMove[0], newMove[1], king)
+        newMove = Action(self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]), king)
+        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], king)
         if validity == "Valid" or validity == "Opponent":
           theMoveList.append(newMove)
 
       return theMoveList
       
-    def GenerateAllValidMoves(self, id):
+    def GenerateAllValidMoves(self, board, id):
       theMoveList = []
       
       self.generators = { }
+      self.currentBoard = board[:]
       
-      if id == self.player.other_player.id:
-        self.enableCheckValidation = False
+      if self.player.id == "1":
+        print("My piece type is lower")
       else:
-        self.enableCheckValidation = True
+        print("My piece type is upper")
       
       for name in self.pieceNames:
         for piece in self.pieceDict[name][id]:
@@ -328,6 +343,14 @@ class AI(BaseAI):
             theMoveList = self.generatorDict[name](piece, theMoveList)
           
       return theMoveList
+      
+    def GetPieceCode(self, piece):
+      code = piece.type[0]
+      if piece.type == "Knight":
+        code = "N"
+      if piece.owner.id == "1":
+        code = code.lower()
+      return code
 
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
@@ -335,15 +358,8 @@ class AI(BaseAI):
         Returns:
             bool: Represents if you want to end your turn. True means end your turn, False means to keep your turn going and re-call this function.
         """
-
-        # Here is where you'll want to code your AI.
-
-        # We've provided sample code that:
-        #    1) prints the board to the console
-        #    2) prints the opponent's last move to the console
-        #    3) prints how much time remaining this AI has to calculate moves
-        #    4) makes a random (and probably invalid) move.
         
+        # Create the current board
         currentBoard = []
         for i in range(0,8):
           currentBoard.append([])
@@ -352,14 +368,9 @@ class AI(BaseAI):
         
         for piece in self.game.pieces:
           i = self.GetFileIndex(piece.file)
-          code = piece.type[0]
-          if piece.type == "Knight":
-            code = "N"
-          if piece.owner.id == "1":
-            code = code.lower()
-          currentBoard[piece.rank-1][i] = code
-        
+          currentBoard[piece.rank-1][i] = self.GetPieceCode(piece)
 
+        # Create the current game state and print it
         currentState = State(currentBoard, None)
         currentState.printBoard()
         
@@ -368,18 +379,17 @@ class AI(BaseAI):
         print("Time Remaining: " + str(self.player.time_remaining) + " ns")
         
         # Make a valid random move
-        self.TheirMoveList = self.GenerateAllValidMoves(self.player.other_player.id)
-        currentState.actionSet = self.GenerateAllValidMoves(self.player.id)
+        currentState.actionSet = self.GenerateAllValidMoves(currentBoard, self.player.id)
         
         newList = []
         for m in currentState.actionSet:
-          newList.append( (m[0], m[1], m[2].type) )
+          newList.append( m )
         print(newList)
         
-        
+
         randomMove = random.choice(currentState.actionSet)
-        print("Moving " + str(randomMove[2].type), randomMove[0], randomMove[1])
-        randomMove[2].move(randomMove[0], randomMove[1])
+        print("Moving " + str(randomMove))
+        randomMove.piece.move(randomMove.to[0], randomMove.to[1])
         # print("Moved to: " + str(newFile) + str(newRank))
         print("End of my turn.")
         return True # to signify we are done with our turn.
