@@ -5,13 +5,14 @@ from joueur.base_ai import BaseAI
 import random
 
 class State():
-  __slots__ = ['board', 'actionTaken', 'actionSet', 'stateID']
+  __slots__ = ['board', 'actionTaken', 'actionSet', 'stateID', 'hasCastled']
   
-  def __init__(self, board, actionTaken):
+  def __init__(self, board, actionTaken, castled=False):
     self.board = board
     self.actionTaken = actionTaken
     self.actionSet = None
     self.stateID = ""
+    self.hasCastled = castled
 
   def assignID(self):
     stateID = ""
@@ -37,20 +38,21 @@ class State():
         print(output)
         
 class Action():
-  __slots__ = ['to', 'frm', 'piece', 'func']
+  __slots__ = ['to', 'frm', 'piece', 'notes', 'promotion']
   
-  def __init__(self, newFile, newRank, piece, func=None):
+  def __init__(self, newFile, newRank, piece, notes="none", promotion=None):
     self.to = (newFile, newRank)
     self.frm = (piece.file, piece.rank)
     self.piece = piece
-    self.func = func
+    self.notes = notes
+    self.promotion = promotion
     
   def __str__(self):
     return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
     
   def __repr__(self):
-    if self.func is not None:
-      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to) + ": " + str(self.func)
+    if self.notes is not None:
+      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to) + ": " + str(self.notes)
     else:
       return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
     
@@ -79,6 +81,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.currentBoard = []
+        self.stateHistory = []
         
         for i in range(0,8):
           self.currentBoard.append([])
@@ -161,7 +164,7 @@ class AI(BaseAI):
           if newFile >= 0 and newFile < 8 and newRank >= 0 and newRank < 8:
             # print(newFile, newRank)
             piece = board[newRank][newFile]
-            print("added x", newFile, newRank)
+            # print("added x", newFile, newRank)
             newState.board[newRank][newFile] = 'X'
             # newState.printBoard()
             if piece is not None and self.GetPieceCode2(piece, self.KNIGHT):
@@ -268,7 +271,13 @@ class AI(BaseAI):
         
       validity = self.CheckValidSpace(newFile, newRank, pawn)
       if validity == "Valid":
-        theMoveList.append( Action(newFile, newRank, pawn, "up one") )
+        if newRank != 1 and newRank != 8:
+          theMoveList.append( Action(newFile, newRank, pawn, "up one") )
+        else:
+          theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.QUEEN))
+          theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.ROOK))
+          theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.BISHOP))
+          theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.KNIGHT))
         
       return theMoveList
       
@@ -452,6 +461,7 @@ class AI(BaseAI):
       theMoveList = self.MovePawnUpTwoRanks(pawn, theMoveList)
       theMoveList = self.CaptureWithPawn(pawn, theMoveList, -1)
       theMoveList = self.CaptureWithPawn(pawn, theMoveList, 1)
+      theMoveList = self.EnPassant(pawn, theMoveList)
       return theMoveList
       
     def GenerateKnightMoves(self, knight, theMoveList):
@@ -542,6 +552,36 @@ class AI(BaseAI):
       
       return False
       
+    def Result(self, action, state):
+      newBoard = []
+      for x in range(0, 8):
+        newBoard.append([])
+        for y in range(0, 8):
+          newBoard[x].append(state.board[x][y])
+          
+      print(self.GetFileIndex(action.frm[0]), action.frm[1])
+      newBoard[self.GetFileIndex(action.frm[0])][action.frm[1]-1] = '.'
+      newBoard[self.GetFileIndex(action.to[0])][action.to[1]-1] = self.GetPieceCode(action.piece)
+      
+      newState = State(newBoard, action)
+
+      return newState
+    
+    def EnPassant(self, pawn, theMoveList):
+      # Take place immediately after a pawn has been moved two spaces
+      if len(self.game.moves) > 0 and self.game.moves[-1].piece.type == self.PAWN:
+        if self.game.moves[-1].to_rank == 4 and self.game.moves[-1].from_rank == 2 or self.game.moves[-1].to_rank == 5 and self.game.moves[-1].from_rank == 7:
+          if abs(self.GetFileIndex(pawn.file) - self.GetFileIndex(self.game.moves[-1].to_file)) == 1:
+            newMove = Action(self.game.moves[-1].to_file, self.ChangeRank(self.game.moves[-1].to_rank, 1), pawn, "e.p.")
+            validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], pawn)
+            if validity == "Valid" or validity == "Opponent":
+              theMoveList.append(newMove)
+            
+      return theMoveList
+
+    def Castle(self, king, rook, theMoveList):
+      pass
+      
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
 
@@ -580,7 +620,13 @@ class AI(BaseAI):
         randomMove = random.choice(currentState.actionSet)
         currentState.printBoard()
         print("Moving " + str(randomMove))
-        randomMove.piece.move(randomMove.to[0], randomMove.to[1])
+        
+        if randomMove.promotion is None:
+          randomMove.piece.move(randomMove.to[0], randomMove.to[1])
+        else:
+          randomMove.piece.move(randomMove.to[0], randomMove.to[1], randomMove.promotion)
+        
+        self.stateHistory.append( self.Result(randomMove, currentState) )
         # print("Moved to: " + str(newFile) + str(newRank))
         print("End of my turn.")
         return True # to signify we are done with our turn.
