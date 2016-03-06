@@ -67,11 +67,15 @@ class AI(BaseAI):
       return theMoveList
       
     def CaptureWithPawn(self, pawn, theMoveList, direction):
+    
+      # Generate new rank and new file
       newRank = self.ChangeRank(pawn.rank, self.player.rank_direction)
       if direction == 'l':
         newFile = self.ChangeFile(pawn.file, -1)
       else:
         newFile = self.ChangeFile(pawn.file, 1)
+      
+      # If there is an enemy piece at that space, this is a valid move
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank and piece.owner != self.player:
           theMoveList.append( (newFile, newRank, pawn) )
@@ -140,13 +144,17 @@ class AI(BaseAI):
     
       # If the space is out of bounds, return False
       if newFile is None or newRank is None:
-        return False
+        return "Invalid"
     
       # Make sure we do not move the piece into an occupied space.
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank:
-            return False
-      return True
+          if piece.owner == self.player:
+            return "Player"
+          else:
+            return "Opponent"
+
+      return "Valid"
       
       
     def MoveListCardinal(self, piece, newMoves, step, direction):
@@ -159,10 +167,16 @@ class AI(BaseAI):
           newMove = (self.ChangeFile(currentFile, step), currentRank, piece)
         else:
           newMove = (currentFile, self.ChangeRank(currentRank, step), piece)
-        if self.CheckValidSpace(newMove[0], newMove[1]):
+        validity = self.CheckValidSpace(newMove[0], newMove[1])
+        if validity == "Valid":
           newMoves.append(newMove)
           currentFile = newMove[0]
           currentRank = newMove[1]
+        elif validity == "Opponent":
+          newMoves.append(newMove)
+          currentFile = newMove[0]
+          currentRank = newMove[1]
+          encounteredPiece = True
         else:
           encounteredPiece = True
       return newMoves
@@ -173,10 +187,16 @@ class AI(BaseAI):
       encounteredPiece = False
       while(encounteredPiece is False):
         newMove = (self.ChangeFile(currentFile, step1), self.ChangeRank(currentRank, step2), piece)
-        if self.CheckValidSpace(newMove[0], newMove[1]):
+        validity = self.CheckValidSpace(newMove[0], newMove[1])
+        if validity == "Valid":
           newMoves.append(newMove)
           currentFile = newMove[0]
           currentRank = newMove[1]
+        elif validity == "Opponent":
+          newMoves.append(newMove)
+          currentFile = newMove[0]
+          currentRank = newMove[1]
+          encounteredPiece = True
         else:
           encounteredPiece = True
       return newMoves
@@ -225,7 +245,8 @@ class AI(BaseAI):
       
       for move in knightMoves:
         newMove = (self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]), knight)
-        if self.CheckValidSpace(newMove[0], newMove[1]) is True:
+        validity = self.CheckValidSpace(newMove[0], newMove[1])
+        if validity == "Valid" or validity == "Opponent":
           theMoveList.append(newMove)
 
       return theMoveList
@@ -233,11 +254,12 @@ class AI(BaseAI):
     def GenerateKingMoves(self, king, theMoveList):
       
       # Generate all the possible King moves
-      kingMoves = [ (0,1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
+      kingMoves = [ (0,1), (1, 0), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1) ]
       
       for move in kingMoves:
         newMove = (self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]), king)
-        if self.CheckValidSpace(newMove[0], newMove[1]) is True:
+        validity = self.CheckValidSpace(newMove[0], newMove[1])
+        if validity == "Valid" or validity == "Opponent":
           theMoveList.append(newMove)
 
       return theMoveList
