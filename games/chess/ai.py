@@ -62,6 +62,20 @@ class AI(BaseAI):
     def GeneratePawnMoves(self, pawn, theMoveList):
       theMoveList = self.MovePawnUpOneRank(pawn, theMoveList)
       theMoveList = self.MovePawnUpTwoRanks(pawn, theMoveList)
+      theMoveList = self.CaptureWithPawn(pawn, theMoveList, 'l')
+      theMoveList = self.CaptureWithPawn(pawn, theMoveList, 'r')
+      return theMoveList
+      
+    def CaptureWithPawn(self, pawn, theMoveList, direction):
+      newRank = self.ChangeRank(pawn.rank, self.player.rank_direction)
+      if direction == 'l':
+        newFile = self.ChangeFile(pawn.file, -1)
+      else:
+        newFile = self.ChangeFile(pawn.file, 1)
+      for piece in self.game.pieces:
+        if piece.file == newFile and piece.rank == newRank and piece.owner != self.player:
+          theMoveList.append( (newFile, newRank, pawn) )
+      
       return theMoveList
       
     def MovePawnUpOneRank(self, pawn, theMoveList):
@@ -286,9 +300,7 @@ class AI(BaseAI):
 
         # 4) Make a Random Valid Move
         
-
         theMoveList = []
-        
 
         for piece in self.pawnList:
           theMoveList = self.GeneratePawnMoves(piece, theMoveList)
@@ -311,7 +323,9 @@ class AI(BaseAI):
         # print("Total Moves:")
         # print(theMoveList)
         
+        
         randomMove = random.choice(theMoveList)
+        print("Moving " + str(randomMove[2]))
         randomMove[2].move(randomMove[0], randomMove[1])
         # print("Moved to: " + str(newFile) + str(newRank))
         print("End of my turn.")
