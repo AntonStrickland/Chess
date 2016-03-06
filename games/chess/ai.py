@@ -408,7 +408,6 @@ class AI(BaseAI):
          
       return validType
     
-      
     def MoveListCardinal(self, piece, newMoves, step, direction):
       currentFile = piece.file
       currentRank = piece.rank
@@ -580,8 +579,40 @@ class AI(BaseAI):
       return theMoveList
 
     def Castle(self, king, rook, theMoveList):
-      pass
       
+      if self.player.rank_direction == 1:
+        theRank = 1
+      else:
+        theRank = 8
+    
+      for move in self.game.moves:
+        # Don't castle if the king has moved previously
+        if move.piece.type == self.KING and move.piece.owner == self.player:
+          return theMoveList
+        
+        # Don't castle if the rook in question has been moved
+        if move.piece.type == self.ROOK and move.piece.owner == self.player:
+          if move.piece.from_file == 'a' and move.piece.from_rank == theRank:
+            hasCastledQueenside = True
+          if move.piece.from_file == 'h' and move.piece.from_rank == theRank:
+            hasCastledKingside = True
+          
+      if hasCastledQueenside is False:
+        validity1 = self.CheckValidSpace('d', theRank, pieceDict[self.KING][self.player.id])
+        validity2 = self.CheckValidSpace('c', theRank, pieceDict[self.KING][self.player.id])
+        if validity1 == "Valid" and validity2 == "Valid":
+          theMoveList.append( Action('c', theRank, pieceDict[self.KING][self.player.id], "0-0-0") )
+              
+      if hasCastledKingside is False:
+        validity1 = self.CheckValidSpace('f', theRank, pieceDict[self.KING][self.player.id])
+        validity2 = self.CheckValidSpace('g', theRank, pieceDict[self.KING][self.player.id])
+        if validity1 == "Valid" and validity2 == "Valid":
+          theMoveList.append( Action('g', theRank, pieceDict[self.KING][self.player.id], "0-0") )
+          
+      return theMoveList
+            
+         
+            
     def run_turn(self):
         """ This is called every time it is this AI.player's turn.
 
