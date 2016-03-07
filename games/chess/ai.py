@@ -48,13 +48,31 @@ class Action():
     self.promotion = promotion
     
   def __str__(self):
-    return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
+    oldTile = (str(self.frm[0]) + str(self.frm[1]))
+    newTile = (str(self.to[0]) + str(self.to[1]))
+    letter = self.piece.type[0]
+    if self.piece.type == "Knight":
+      letter = "N"
+    if self.piece.type == "Pawn":
+      letter = ""
+      
+    capture = ""
+    if self.notes == "capture":
+      capture = "x"
+      
+    promote = ""
+    if self.promotion is not None:
+      promote = "=" + self.promotion[0]
+      if self.promotion == "Knight":
+        promote = "=" + "N"
+      
+    return letter + oldTile + " " + letter + capture + newTile + promote
     
-  def __repr__(self):
+  '''
     if self.notes is not None:
       return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to) + ": " + str(self.notes)
     else:
-      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)
+      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)'''
     
 class AI(BaseAI):
     """ The basic AI functions that are the same between games. """
@@ -136,7 +154,6 @@ class AI(BaseAI):
     # Checks if the king is in check by examining each possible enemy position.
     # First start at the king's position on the board, and work backwards.
     # If an enemy is encountered based on their attack pattern then we know we are in check.
-    # (There are still some mysterious problems here, but there is not enough time to fix them.)
     
     def CheckIfInCheck(self, board, kingFile, kingRank):
     
@@ -236,7 +253,7 @@ class AI(BaseAI):
         piece = board[currentRank][currentFile]
         
         if self.GetPieceCode2(piece, self.QUEEN) or self.GetPieceCode2(piece, self.BISHOP):
-          print("Don't move to " + str(file) + str(rank) + self.BISHOP)
+          # print("Don't move to " + str(file) + str(rank) + self.BISHOP)
           return True
         elif piece != '.':
           return False
@@ -255,7 +272,7 @@ class AI(BaseAI):
           validity = self.CheckValidSpace(newFile, newRank, pawn)
           if validity == "Opponent":
             if newRank != 1 and newRank != 8:
-              theMoveList.append( Action(newFile, newRank, pawn, "Capture") )
+              theMoveList.append( Action(newFile, newRank, pawn, "capture") )
             else:
               theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.QUEEN))
               theMoveList.append( Action(newFile, newRank, pawn, "promotion", self.ROOK))
@@ -424,6 +441,7 @@ class AI(BaseAI):
           currentFile = newMove.to[0]
           currentRank = newMove.to[1]
         elif validity == "Opponent":
+          newMove.notes = "capture"
           newMoves.append(newMove)
           encounteredPiece = True
         else:
@@ -449,6 +467,7 @@ class AI(BaseAI):
           currentFile = newMove.to[0]
           currentRank = newMove.to[1]
         elif validity == "Opponent":
+          newMove.notes = "capture"
           newMoves.append(newMove)
           encounteredPiece = True
         else:
@@ -471,6 +490,8 @@ class AI(BaseAI):
         newMove = Action(self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]), knight)
         validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], knight)
         if validity == "Valid" or validity == "Opponent":
+          if validity == "Opponent":
+            newMove.notes = "capture"
           theMoveList.append(newMove)
       return theMoveList
     
@@ -500,6 +521,8 @@ class AI(BaseAI):
         newMove = Action(self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]), king)
         validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], king)
         if validity == "Valid" or validity == "Opponent":
+          if validity == "Opponent":
+              newMove.notes = "capture"
           theMoveList.append(newMove)
       theMoveList = self.Castle(theMoveList)
       return theMoveList
@@ -640,11 +663,11 @@ class AI(BaseAI):
 
         # Create the current game state and print it
         currentState = State(currentBoard, None)
-        currentState.printBoard()
+        # currentState.printBoard()
         
-        if len(self.game.moves) > 0:
-            print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
-        print("Time Remaining: " + str(self.player.time_remaining) + " ns")
+        #if len(self.game.moves) > 0:
+        #    print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
+        #print("Time Remaining: " + str(self.player.time_remaining) + " ns")
         
         # Make a valid random move
         currentState.actionSet = self.GenerateAllValidMoves(currentBoard, self.player.id)
@@ -659,10 +682,7 @@ class AI(BaseAI):
             randomMoveList.append(move)
         
         for move in randomMoveList:
-          print(move, move.notes)
-        
-        currentState.printBoard()
-        # print("Moving " + str(randomMove))
+          print(move)
         
         if randomMove.promotion is None:
           randomMove.piece.move(randomMove.to[0], randomMove.to[1])
@@ -670,6 +690,7 @@ class AI(BaseAI):
           randomMove.piece.move(randomMove.to[0], randomMove.to[1], randomMove.promotion)
         
         self.stateHistory.append( self.Result(randomMove, currentState) )
-        # print("Moved to: " + str(newFile) + str(newRank))
-        print("End of my turn.")
+
+        print("-----")
+        # print("End of my turn.")
         return True # to signify we are done with our turn.
