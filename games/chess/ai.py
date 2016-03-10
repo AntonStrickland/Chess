@@ -3,6 +3,7 @@
 
 from joueur.base_ai import BaseAI
 import random
+import datetime
 
 class State():
   __slots__ = ['board', 'actionTaken', 'actionSet', 'stateID', 'hasCastled']
@@ -47,6 +48,9 @@ class Action():
     self.notes = notes
     self.promotion = promotion
     
+  def __repr__(self):
+    return self.__str__()
+    
   def __str__(self):
     oldTile = (str(self.frm[0]) + str(self.frm[1]))
     newTile = (str(self.to[0]) + str(self.to[1]))
@@ -56,23 +60,23 @@ class Action():
     if self.piece.type == "Pawn":
       letter = ""
       
-    capture = ""
-    if self.notes == "capture":
-      capture = "x"
-      
-    promote = ""
-    if self.promotion is not None:
-      promote = "=" + self.promotion[0]
-      if self.promotion == "Knight":
-        promote = "=" + "N"
-      
-    return letter + oldTile + " " + letter + capture + newTile + promote
-    
-  '''
-    if self.notes is not None:
-      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to) + ": " + str(self.notes)
+    if self.notes == "0-0-0" or self.notes == "0-0":
+      return letter + oldTile + " " + self.notes
     else:
-      return str(self.piece.type) + " from " + str(self.frm) + " to " + str(self.to)'''
+      capture = ""
+      if self.notes == "capture":
+        capture = "x"
+      ep = ""
+      if self.notes == "e.p.":
+        ep = "e.p."
+        
+      promote = ""
+      if self.promotion is not None:
+        promote = "=" + self.promotion[0]
+        if self.promotion == "Knight":
+          promote = "=" + "N"
+      
+    return letter + oldTile + " " + letter + capture + newTile + ep + promote
     
 class AI(BaseAI):
     """ The basic AI functions that are the same between games. """
@@ -100,7 +104,11 @@ class AI(BaseAI):
         self.QUEEN = "Queen"
         self.KING = "King"
         
-        random.seed()
+        
+        self.startTime = self.player.time_remaining
+        self.randomSeed = datetime.datetime.now()
+        
+        random.seed(self.randomSeed)
         
         self.pieceNames = [self.PAWN, self.KNIGHT, self.BISHOP, self.ROOK, self.QUEEN, self.KING]
         
@@ -149,6 +157,9 @@ class AI(BaseAI):
         """
 
         # replace with your end logic
+        print("Seconds taken: " + str((self.startTime - self.player.time_remaining)/1000000000))
+        print("Turns taken: " + str(self.game.current_turn))
+        print("Random seed: " + str(self.randomSeed))
  
 
     # Checks if the king is in check by examining each possible enemy position.
@@ -673,7 +684,10 @@ class AI(BaseAI):
         currentState.actionSet = self.GenerateAllValidMoves(currentBoard, self.player.id)
        
         # Pick a random move from the list of valid moves for this turn
-        randomMove = random.choice(currentState.actionSet)
+        if len(currentState.actionSet) > 0:
+          randomMove = random.choice(currentState.actionSet)
+        else:
+          return True
         
         # Get a list of moves for the randomly chosen piece
         randomMoveList = []
@@ -681,8 +695,11 @@ class AI(BaseAI):
           if move.piece == randomMove.piece:
             randomMoveList.append(move)
         
-        for move in randomMoveList:
-          print(move)
+        print("-----")
+        print("Turn " + str(self.game.current_turn))
+        print("-----")
+        #for move in currentState.actionSet:
+        print(currentState.actionSet)
         
         if randomMove.promotion is None:
           randomMove.piece.move(randomMove.to[0], randomMove.to[1])
@@ -691,6 +708,6 @@ class AI(BaseAI):
         
         self.stateHistory.append( self.Result(randomMove, currentState) )
 
-        print("-----")
+       
         # print("End of my turn.")
         return True # to signify we are done with our turn.
