@@ -1,13 +1,14 @@
 class State():
-  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'hasCastled']
+  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled']
   
-  def __init__(self, board, playerID, actionTaken, castled=False):
+  def __init__(self, board, playerID, actionTaken, utility, castled=False):
     self.board = board
     self.actionTaken = actionTaken
     self.playerID = playerID
     self.actionSet = None
     self.stateID = self.assignID()
     self.hasCastled = castled
+    self.utility = utility
 
   def assignID(self):
     stateID = ""
