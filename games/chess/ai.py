@@ -33,7 +33,7 @@ class AI(BaseAI):
       def Search(self, rootNode, id):
         # Test with a depth limit of 3
         self.playerID = id
-        for depth in range(0,3):
+        for depth in range(0,4):
           print(depth)
           self.totalNodes = 1
           result = self.MiniMaxDecision(rootNode, depth)
@@ -73,7 +73,7 @@ class AI(BaseAI):
           return u
           
         print("MIN: ", depth, state.actionTaken, len(state.actionSet))
-        # print(state.actionSet)
+        print(state.actionSet)
         v = sys.maxsize
         for action in state.actionSet:
           v = min(v, self.MaxValue(self.Result(state, action), depth-1))
@@ -89,7 +89,7 @@ class AI(BaseAI):
           return u
           
         print("MAX: ", depth, state.actionTaken, len(state.actionSet))
-        # print(state.actionSet)
+        print(state.actionSet)
         v = -1*sys.maxsize
         for action in state.actionSet:
           v = max(v, self.MinValue(self.Result(state, action), depth-1))
@@ -102,14 +102,31 @@ class AI(BaseAI):
         return self.CheckIfInCheckMate(state)
         
       def CheckIfInCheckMate(self, state):
-        # Look for the king's new position and see if he is in check or not (with a reason why)
-        isCheck = False
-        for x in range(0,8):
-            for y in range(0,8):
-              if state.board[x][y] == self.MoveGenerator.GetPieceCode(self.MoveGenerator.pieceDict[self.MoveGenerator.KING][self.MoveGenerator.player.id][0]):
-                isCheck,reason = self.MoveGenerator.CheckIfInCheck(state.board[:], y, x)
-        if isCheck == True and state.actionSet == None:
-          return True
+        # If this is the opponent's turn, then check if they are in check and have no moves available
+        if self.MoveGenerator.playerAtPlay == self.MoveGenerator.player.other_player.id:
+          
+          # Look for the king's new position and see if he is in check or not (with a reason why)
+          isCheck = False
+         
+          kingCode = self.MoveGenerator.pieceDict[self.MoveGenerator.KING][self.MoveGenerator.player.other_player.id][0]
+          theirKing = self.MoveGenerator.GetPieceCode(kingCode)
+          for x in range(0,8):
+              for y in range(0,8):
+                if state.board[x][y] == theirKing:
+                  print(x, y, theirKing, self.MoveGenerator.playerAtPlay)
+                  isCheck,reason = self.MoveGenerator.CheckIfInCheck(state.board[:], y, x, state.board[x][y])
+                  
+          if isCheck == True:
+            print("In check!!!", reason)
+            state.utility += 10
+            state.printBoard()
+            
+          if isCheck == True and state.actionSet == None:
+            print("Checkmate!!!")
+            state.utility = sys.maxsize
+            return True
+            
+        return False
         
       # Returns a new state when given an action and a current state
       def Result(self, state, action):
@@ -123,16 +140,17 @@ class AI(BaseAI):
         newBoard[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
         newBoard[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)
         
-        newID = "0"
-        if state.playerID == "0":
-          newID = "1"
-        
-        newState = states.State(newBoard, newID, action, self.Utility(state))
-        self.MoveGenerator.playerAtPlay = newID
-        newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newBoard, newID)
+        self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
+        newState = states.State(newBoard, self.MoveGenerator.playerAtPlay, action, self.Utility(state))
+        newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newBoard, self.MoveGenerator.playerAtPlay)
         return newState
 
       def Utility(self, state):
+      
+        # If this is a checkmate state then return the best possible utility
+        if state.utility == sys.maxsize:
+          return state.utility
+      
         u = state.utility
         # For every piece on the board, add the piece's value to utility
         for x in range(0, len(state.board)):
@@ -172,7 +190,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.startTime = self.player.time_remaining
-        self.randomSeed = datetime.datetime.now()
+        self.randomSeed = 0 # datetime.datetime.now()
         
         self.playerAtPlay = self.player.id
         
@@ -228,13 +246,19 @@ class AI(BaseAI):
         print("Seconds taken: " + str((self.startTime - self.player.time_remaining)/1000000000))
         print("Turns taken: " + str(self.game.current_turn))
         print("Random seed: " + str(self.randomSeed))
- 
+        
+    def SwitchPlayerAtPlay(self, id):
+      newID = "0"
+      if id == "0":
+        newID = "1"
+      self.playerAtPlay = newID
+      return
+        
     def GetPieceAtBoard(self, board, newFile, newRank):
       if newFile is not None and newRank is not None:
         if newFile >= 0 and newFile < 8 and newRank >= 0 and newRank < 8:
           return board[newRank][newFile]
       return None
-      
       
     def GetRankDirection(self):
       if self.playerAtPlay == self.player.id:
@@ -246,42 +270,45 @@ class AI(BaseAI):
     # First start at the king's position on the board, and work backwards.
     # If an enemy is encountered based on their attack pattern then we know we are in check.
     
-    def CheckIfInCheck(self, board, kingFile, kingRank):
+    def CheckIfInCheck(self, board, kingFile, kingRank, king):
     
       # print("---------------")
       
       # newState = State(board, self.player.id, None)
       # newState.printBoard()
       piece = self.GetPieceAtBoard(board, kingFile - 1, kingRank + self.GetRankDirection())
-      if piece is not None and self.GetPieceCode2(piece, self.PAWN):
+
+      if piece is not None and self.GetPieceCode2(piece, self.PAWN, king):
+        # print(piece, self.GetPieceCode2(piece,self.PAWN))
         return True, self.PAWN
       
       piece = self.GetPieceAtBoard(board, kingFile + 1, kingRank + self.GetRankDirection())
-      if piece is not None and self.GetPieceCode2(piece, self.PAWN):
+      if piece is not None and self.GetPieceCode2(piece, self.PAWN, king):
+        # print(piece, self.GetPieceCode2(piece,self.PAWN))
         return True, self.PAWN
           
       for move in self.knightMoves:
         piece = self.GetPieceAtBoard(board, kingFile + move[0], kingRank + move[1])
-        if piece is not None and self.GetPieceCode2(piece, self.KNIGHT):
+        if piece is not None and self.GetPieceCode2(piece, self.KNIGHT, king):
           return True, self.KNIGHT
 
       for move in self.rookMoves:
-        if self.CheckCardinally(board, kingFile, kingRank, move[0], move[1]):
+        if self.CheckCardinally(board, kingFile, kingRank, king, move[0], move[1]):
           return True, self.ROOK
 
       for move in self.bishopMoves:
-        if self.CheckDiagonally(board, kingFile, kingRank, move[0], move[1]):
+        if self.CheckDiagonally(board, kingFile, kingRank, king, move[0], move[1]):
           return True, self.BISHOP
           
       for move in self.kingMoves:
         piece = self.GetPieceAtBoard(board, kingFile + move[0], kingRank + move[1])
-        if piece is not None and self.GetPieceCode2(piece, self.KING):
+        if piece is not None and self.GetPieceCode2(piece, self.KING, king):
           return True, self.KING
           
       return False, None
     
     # Checks a board cardinally to see if the king is in check    
-    def CheckCardinally(self, board, file, rank, step, direction):
+    def CheckCardinally(self, board, file, rank, king, step, direction):
       currentFile = file
       currentRank = rank
 
@@ -300,7 +327,7 @@ class AI(BaseAI):
         piece = board[currentRank][currentFile]
 
         # If we run into an enemy and it is a queen or rook we are in check
-        if self.GetPieceCode2(piece, self.QUEEN) or self.GetPieceCode2(piece, self.ROOK):
+        if self.GetPieceCode2(piece, self.QUEEN, king) or self.GetPieceCode2(piece, self.ROOK, king):
           # print("Don't move to " + str(file) + str(rank) + self.ROOK)
           return True
         elif piece != '.':
@@ -309,7 +336,7 @@ class AI(BaseAI):
       return False
     
     # Checks a board diagonally to see if the king is in check
-    def CheckDiagonally(self, board, file, rank, step1, step2):
+    def CheckDiagonally(self, board, file, rank, king, step1, step2):
     
       currentFile = file
       currentRank = rank
@@ -324,7 +351,7 @@ class AI(BaseAI):
           
         piece = board[currentRank][currentFile]
         
-        if self.GetPieceCode2(piece, self.QUEEN) or self.GetPieceCode2(piece, self.BISHOP):
+        if self.GetPieceCode2(piece, self.QUEEN, king) or self.GetPieceCode2(piece, self.BISHOP, king):
           # print("Don't move to " + str(file) + str(rank) + self.BISHOP)
           return True
         elif piece != '.':
@@ -375,7 +402,9 @@ class AI(BaseAI):
     def MovePawnUpTwoRanks(self, pawn, theMoveList):
         
       # Make sure we only do this on the initial rank
-      if pawn.rank != 2:
+      if self.playerAtPlay == self.player.id and pawn.rank != 2 :
+        return theMoveList
+      elif self.playerAtPlay == self.player.other_player.id and pawn.rank != 7 :
         return theMoveList
         
       # Make sure we do not move the pawn through an occupied space.
@@ -482,7 +511,7 @@ class AI(BaseAI):
       for x in range(0,8):
           for y in range(0,8):
             if newBoard[x][y] == self.GetPieceCode(self.pieceDict[self.KING][self.player.id][0]):
-              isCheck,reason = self.CheckIfInCheck(newBoard[:], y, x)
+              isCheck,reason = self.CheckIfInCheck(newBoard[:], y, x, newBoard[x][y])
               # print(reason)
               # If he is in check, return Invalid
               if isCheck is True:
@@ -623,21 +652,32 @@ class AI(BaseAI):
         code = code.lower()
       return code
       
-    def GetPieceCode2(self, piece, name):
+    def GetPieceCode2(self, piece, name, king):
       # Infer the player based on letter case
       # Should return True if we have found the designated enemy 
-      
-      king = self.GetPieceCode(self.pieceDict[self.KING][self.player.id][0])
-      n = name[0]
-      if name == self.KNIGHT:
-        n = 'N'
-
-      if piece == '.':
+     
+      if piece == '.' or piece == None:
         return False
+        
+      n = name[0]
+      if name == self.KNIGHT and self.playerAtPlay == self.player.id:
+        n = 'N'
+      elif name == self.KNIGHT and self.playerAtPlay == self.player.other_player.id:
+        n = 'n'
       
+      # print(piece, king)
+      # p,K : P,k -> check
+      
+      # If the piece is black and the king is white, check!
       if piece == n.lower() and king == king.upper():
+        print(piece, king)
+        print("Check 1")
         return True
+        
+      # If the piece is white and the king is black, check!
       if piece == n.upper() and king == king.lower():
+        print(piece, king)
+        print("Check 2")
         return True
       
       return False
