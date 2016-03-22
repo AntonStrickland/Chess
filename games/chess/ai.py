@@ -5,11 +5,8 @@ from joueur.base_ai import BaseAI
 import random
 import datetime
 import sys
-# import movegen
-# import iddlmm
-import size
 import states
-
+# import size
 
 class AI(BaseAI):
     """ The basic AI functions that are the same between games. """
@@ -23,57 +20,63 @@ class AI(BaseAI):
         self.MoveGenerator = generator
         self.PieceValue = {}
         self.PieceValue['.'] = 0
-        self.PieceValue["p"] = 1
-        self.PieceValue["n"] = 3
-        self.PieceValue["b"] = 3
-        self.PieceValue["r"] = 5
-        self.PieceValue["q"] = 9
-        self.PieceValue["k"] = 0
+        self.PieceValue['p'] = 1
+        self.PieceValue['n'] = 3
+        self.PieceValue['b'] = 3
+        self.PieceValue['r'] = 5
+        self.PieceValue['q'] = 9
+        self.PieceValue['k'] = 100
         
       def Search(self, rootNode, id):
         # Test with a depth limit of 3
         self.playerID = id
-        for depth in range(0,4):
-          print(depth)
+        depthLimit = 2
+        for depth in range(0,depthLimit):
+          print("Current Depth:", depth)
           self.totalNodes = 1
           result = self.MiniMaxDecision(rootNode, depth)
-          print(self.totalNodes)
+          # print(self.totalNodes)
         return result
         
       def MiniMaxDecision(self, initialState, depth):
-        initialState.printBoard()
+        # initialState.printBoard()
         if self.TerminalTest(initialState, depth):
           return self.Utility(initialState)
           
-        print("MINIMAX: ", depth, initialState.actionTaken, len(initialState.actionSet))
+        # print("MINIMAX: ", depth, initialState.actionTaken, len(initialState.actionSet))
         # print(initialState.actionSet)
         v = -1*sys.maxsize
         prev = v
         a = None
         for action in initialState.actionSet:
-          v = max(v, self.MinValue(self.Result(initialState, action), depth-1))
+          mm = self.MinValue(self.Result(initialState, action), depth-1)
+          v = max(v, mm)
           if v > prev:
             a = action
             prev = v
             print("New Utility: ", v, "Action: ", a)
-          elif v == prev:
-            if random.random() > 1.0:
-              print("Random switch!")
+          elif mm == prev:
+            # 50% chance to choose current action if same utility as the best
+            if random.random() > 0.5:
               a = action
+              print("Random switch! New Utility: ", v, "Action: ", a)
         print("Utility: ", v, "Action: ", a)
         return a
         
       def MinValue(self, state, depth):
         
         # state.printBoard()
-        if self.TerminalTest(state, depth):
+        '''if self.TerminalTest(state, depth):
           u = self.Utility(state)
-          #if u != 0:
-          #  print("Utility: ", u, "Prev:", state.utility, "Action:", state.actionTaken, "Depth:", depth)
-          return u
+          return u'''
           
-        print("MIN: ", depth, state.actionTaken, len(state.actionSet))
-        print(state.actionSet)
+        if depth <= 0:
+          return self.Utility(state)
+        if self.CheckIfInCheckMate(state):
+          return sys.maxsize
+          
+        # print("MIN: ", depth, state.actionTaken, len(state.actionSet))
+        # print(state.actionSet)
         v = sys.maxsize
         for action in state.actionSet:
           v = min(v, self.MaxValue(self.Result(state, action), depth-1))
@@ -82,14 +85,18 @@ class AI(BaseAI):
       def MaxValue(self, state, depth):
         
         # state.printBoard()
+        '''
         if self.TerminalTest(state, depth):
           u = self.Utility(state)
-          #if u != 0:
-          #  print("Utility: ", u, "Prev:", state.utility, "Action:", state.actionTaken, "Depth:", depth)
-          return u
+          return u'''
           
-        print("MAX: ", depth, state.actionTaken, len(state.actionSet))
-        print(state.actionSet)
+        if depth <= 0:
+          return self.Utility(state)
+        if self.CheckIfInCheckMate(state):
+          return sys.maxsize
+          
+        # print("MAX: ", depth, state.actionTaken, len(state.actionSet))
+        # print(state.actionSet)
         v = -1*sys.maxsize
         for action in state.actionSet:
           v = max(v, self.MinValue(self.Result(state, action), depth-1))
@@ -113,17 +120,17 @@ class AI(BaseAI):
           for x in range(0,8):
               for y in range(0,8):
                 if state.board[x][y] == theirKing:
-                  print(x, y, theirKing, self.MoveGenerator.playerAtPlay)
-                  isCheck,reason = self.MoveGenerator.CheckIfInCheck(state.board[:], y, x, state.board[x][y])
+                  # print(x, y, theirKing, self.MoveGenerator.playerAtPlay)
+                  isCheck,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, state.board[x][y])
                   
           if isCheck == True:
             print("In check!!!", reason)
-            state.utility += 10
-            state.printBoard()
+            # state.utility += 10
+            # state.printBoard()
             
           if isCheck == True and state.actionSet == None:
             print("Checkmate!!!")
-            state.utility = sys.maxsize
+            # state.utility += 9001
             return True
             
         return False
@@ -142,26 +149,170 @@ class AI(BaseAI):
         
         self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
         newState = states.State(newBoard, self.MoveGenerator.playerAtPlay, action, self.Utility(state))
+        
+        # Adjust the turns remaining to a draw
+        if action.piece.type == self.MoveGenerator.PAWN or action.hasCaptured == True or action.notes == "e.p.":
+          newState.turnsToDraw = 50
+        else:
+          newState.turnsToDraw -= 1
+        
         newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newBoard, self.MoveGenerator.playerAtPlay)
         return newState
+        
+      # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
+      def IsNotEnoughPieces(self, state):
+      
+        knightsLower = 0
+        knightsUpper = 0
+        bishopsUpper = 0
+        bishopsLower = 0
+        bishopSquareLower = (0,0)
+        bishopSquareUpper = (0,0)
+        lowerPieces = []
+        upperPieces = []
+      
+        for x in range(0, len(state.board)):
+          for y in range(0, len(state.board)):
+            if state.board[x][y] != '.':
+              if state.board[x][y] == state.board[x][y].lower():
+                lowerPieces.append(state.board[x][y])
+                if state.board[x][y] == 'B':
+                  bishopsUpper += 1
+                  bishopSquareUpper = (x,y)
+                elif state.board[x][y] == 'N':
+                  knightsUpper += 1
+              if state.board[x][y] == state.board[x][y].upper():
+                upperPieces.append(state.board[x][y])
+                if state.board[x][y] == 'b':
+                  bishopsLower += 1
+                  bishopSquareLower = (x,y)
+                elif state.board[x][y] == 'n':
+                  knightsLower += 1
+                
+        # Only check if 2 or less pieces remaining on each side
+        if len(lowerPieces) > 2 or len(upperPieces) > 2:
+          return False
+          
+        # King vs. King
+        if len(lowerPieces) == 1 and len(upperPieces) == 1:
+          return True
+        
+        # King vs. King and Bishop, or King vs. King and Knight
+        if bishopsLower != bishopsUpper or knightsLower != knightsUpper:
+          return True
+        
+        # King and Bishop vs. King and Bishop, where bishops are on same colored squares
+        if (bishopSquareLower[0] + bishopSquareLower[1]) % 2 == (bishopSquareUpper[0] + bishopSquareUpper[1]) % 2:
+          return True
+          
+        return False
+          
+
+      def IsThreeFoldRepetition(self, state):
+        m = self.MoveGenerator.game.moves
+        if len(m) >= 8 and state.turnsToDraw <= 92:
+          # print(len(m),state.turnsToDraw)
+          if self.IsMoveEqual(m[-1],m[-8]) and self.IsMoveEqual(m[-2],m[-7]):
+            if self.IsMoveEqual(m[-3],m[-6]) and self.IsMoveEqual(m[-4],m[-5]):
+              print("Threefold repetition detected!")
+              return True
+        return False
+        
+      def IsMoveEqual(self, move1, move2):
+        if move1.to_file == move2.from_file and move1.to_rank == move2.from_rank:
+          if move2.to_file == move1.from_file and move2.to_rank == move1.from_rank:
+            return True
+        return False
 
       def Utility(self, state):
       
         # If this is a checkmate state then return the best possible utility
-        if state.utility == sys.maxsize:
-          return state.utility
+        #if state.utility >= 8000:
+        #  return state.utility
+          
+        # Avoid draw where you have no moves left but not in check (stalemate)
+        if len(state.actionSet) == 0:
+          return -1*sys.maxsize
+          
+        # Avoid draw where in 50 moves no pawn has moved or piece captured
+        if state.turnsToDraw <= 0:
+          return -1*sys.maxsize
+          
+        # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
+        if self.IsNotEnoughPieces(state):
+          return -1*sys.maxsize
+          
+        # Avoid draw where threefold repetition
+        if self.IsThreeFoldRepetition(state):
+          return -1*sys.maxsize
+        
+        u = 0
+        
+        '''
+        if state.actionTaken is not None:
+          piece = self.MoveGenerator.GetPieceCode(state.actionTaken.piece)
+          y = self.MoveGenerator.GetFileIndex(state.actionTaken.to[0])
+          x = state.actionTaken.to[1]-1
+          isAttacked,reason = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece)
+          
+          # If this piece is under attack by a piece of lesser value, then this is a worse move
+          if isAttacked == True:
+            if state.actionTaken.piece.type == self.MoveGenerator.PAWN or state.actionTaken.piece.type == self.MoveGenerator.KING:
+              u -= 8
+            elif state.actionTaken.piece.type == self.MoveGenerator.KNIGHT:
+              u -= 4
+            elif state.actionTaken.piece.type == self.MoveGenerator.BISHOP:
+              u -= 4
+            elif state.actionTaken.piece.type == self.MoveGenerator.ROOK:
+              u -= 2
+            elif state.actionTaken.piece.type == self.MoveGenerator.QUEEN:
+              u -= 1
+              
+          # If this piece is protected by another team mate, then this is a better move
+          isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece, True)
+          if isProtected:
+            # print("Protected by", reason)
+            u += 10
+            
+          # If this move captures a piece, then this is a better move depending on the type of piece captured
+          if state.actionTaken.hasCaptured == True:
+            if state.actionTaken.capturedPiece == self.MoveGenerator.PAWN:
+              u += 1
+            if state.actionTaken.capturedPiece == self.MoveGenerator.KNIGHT:
+              u += 3
+            if state.actionTaken.capturedPiece == self.MoveGenerator.BISHOP:
+              u += 3
+            if state.actionTaken.capturedPiece == self.MoveGenerator.ROOK:
+              u += 5
+            if state.actionTaken.capturedPiece == self.MoveGenerator.QUEEN:
+              u += 10
+            
+          # Prefer moves that go to the center of the board early on
+          if len(self.MoveGenerator.game.moves) < 20:
+            if state.actionTaken.frm[1] == 1 or state.actionTaken.frm[1] == 8:
+              u -= 4
+            elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
+              u -= 3
+            elif state.actionTaken.frm[1] == 3 or state.actionTaken.frm[1] == 6:
+              u -= 2
+            elif state.actionTaken.frm[1] == 4 or state.actionTaken.frm[1] == 5:
+              u -= 1
+        '''
       
-        u = state.utility
+        # print("Player id", self.playerID)
         # For every piece on the board, add the piece's value to utility
         for x in range(0, len(state.board)):
           for y in range(0, len(state.board)):
+          
             if self.playerID == "1":
-              if state.board[x][y].lower() == state.board[x][y]:
+              # If we are looking at a lowercase piece and we are black
+              if state.board[x][y].islower():
                 u += self.PieceValue[state.board[x][y]]
               else:
                 u -= self.PieceValue[state.board[x][y].lower()] 
             else:
-              if state.board[x][y].upper() == state.board[x][y]:
+              # If we are looking at an uppercase piece and we are white
+              if state.board[x][y].isupper():
                 u += self.PieceValue[state.board[x][y].lower()]
               else:
                 u -= self.PieceValue[state.board[x][y]]  
@@ -270,7 +421,7 @@ class AI(BaseAI):
     # First start at the king's position on the board, and work backwards.
     # If an enemy is encountered based on their attack pattern then we know we are in check.
     
-    def CheckIfInCheck(self, board, kingFile, kingRank, king):
+    def CheckIfUnderAttack(self, board, kingFile, kingRank, pieceInCheck, friendlyFire=False):
     
       # print("---------------")
       
@@ -278,41 +429,41 @@ class AI(BaseAI):
       # newState.printBoard()
       piece = self.GetPieceAtBoard(board, kingFile - 1, kingRank + self.GetRankDirection())
 
-      if piece is not None and self.GetPieceCode2(piece, self.PAWN, king):
+      if piece is not None and self.GetPieceCode2(piece, self.PAWN, pieceInCheck, friendlyFire):
         # print(piece, self.GetPieceCode2(piece,self.PAWN))
         return True, self.PAWN
       
       piece = self.GetPieceAtBoard(board, kingFile + 1, kingRank + self.GetRankDirection())
-      if piece is not None and self.GetPieceCode2(piece, self.PAWN, king):
+      if piece is not None and self.GetPieceCode2(piece, self.PAWN, pieceInCheck, friendlyFire):
         # print(piece, self.GetPieceCode2(piece,self.PAWN))
         return True, self.PAWN
           
       for move in self.knightMoves:
         piece = self.GetPieceAtBoard(board, kingFile + move[0], kingRank + move[1])
-        if piece is not None and self.GetPieceCode2(piece, self.KNIGHT, king):
+        if piece is not None and self.GetPieceCode2(piece, self.KNIGHT, pieceInCheck, friendlyFire):
           return True, self.KNIGHT
 
       for move in self.rookMoves:
-        if self.CheckCardinally(board, kingFile, kingRank, king, move[0], move[1]):
+        if self.CheckCardinally(board, kingFile, kingRank, pieceInCheck, move[0], move[1], friendlyFire):
           return True, self.ROOK
 
       for move in self.bishopMoves:
-        if self.CheckDiagonally(board, kingFile, kingRank, king, move[0], move[1]):
+        if self.CheckDiagonally(board, kingFile, kingRank, pieceInCheck, move[0], move[1], friendlyFire):
           return True, self.BISHOP
           
       for move in self.kingMoves:
         piece = self.GetPieceAtBoard(board, kingFile + move[0], kingRank + move[1])
-        if piece is not None and self.GetPieceCode2(piece, self.KING, king):
+        if piece is not None and self.GetPieceCode2(piece, self.KING, pieceInCheck, friendlyFire):
           return True, self.KING
           
       return False, None
     
     # Checks a board cardinally to see if the king is in check    
-    def CheckCardinally(self, board, file, rank, king, step, direction):
+    def CheckCardinally(self, board, file, rank, king, step, direction, friendlyFire=False):
       currentFile = file
       currentRank = rank
 
-      newState = states.State(board[:], self.player.id, None, 0)
+      newState = states.State(board, self.player.id, None, 0)
       while currentFile is not None and currentRank is not None:
         
         if direction == 'h':
@@ -327,7 +478,7 @@ class AI(BaseAI):
         piece = board[currentRank][currentFile]
 
         # If we run into an enemy and it is a queen or rook we are in check
-        if self.GetPieceCode2(piece, self.QUEEN, king) or self.GetPieceCode2(piece, self.ROOK, king):
+        if self.GetPieceCode2(piece, self.QUEEN, king, friendlyFire) or self.GetPieceCode2(piece, self.ROOK, king, friendlyFire):
           # print("Don't move to " + str(file) + str(rank) + self.ROOK)
           return True
         elif piece != '.':
@@ -336,11 +487,11 @@ class AI(BaseAI):
       return False
     
     # Checks a board diagonally to see if the king is in check
-    def CheckDiagonally(self, board, file, rank, king, step1, step2):
+    def CheckDiagonally(self, board, file, rank, king, step1, step2, friendlyFire=False):
     
       currentFile = file
       currentRank = rank
-      newState = states.State(board[:], self.player.id, None, 0)
+      newState = states.State(board, self.player.id, None, 0)
       while currentFile is not None and currentRank is not None:
 
         currentFile = currentFile + step1
@@ -351,7 +502,7 @@ class AI(BaseAI):
           
         piece = board[currentRank][currentFile]
         
-        if self.GetPieceCode2(piece, self.QUEEN, king) or self.GetPieceCode2(piece, self.BISHOP, king):
+        if self.GetPieceCode2(piece, self.QUEEN, king, friendlyFire) or self.GetPieceCode2(piece, self.BISHOP, king, friendlyFire):
           # print("Don't move to " + str(file) + str(rank) + self.BISHOP)
           return True
         elif piece != '.':
@@ -368,10 +519,10 @@ class AI(BaseAI):
       # If there is an enemy piece at that space, this is a valid move
       for piece in self.game.pieces:
         if piece.file == newFile and piece.rank == newRank and piece.owner != self.player:
-          validity = self.CheckValidSpace(newFile, newRank, pawn)
+          validity,reason = self.CheckValidSpace(newFile, newRank, pawn)
           if validity == "Opponent":
             if newRank != 1 and newRank != 8:
-              theMoveList.append( states.Action(newFile, newRank, pawn, "capture") )
+              theMoveList.append( states.Action(newFile, newRank, pawn, True, reason) )
             else:
               theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.QUEEN))
               theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.ROOK))
@@ -387,7 +538,7 @@ class AI(BaseAI):
       # print(str(self.player.id) + " moved from " + str(pawn.file) + str(pawn.rank) + " to " + str(newFile) + str(newRank))
       
       # Make sure the space is valid. Also consider pawn promotions.
-      validity = self.CheckValidSpace(newFile, newRank, pawn)
+      validity,reason = self.CheckValidSpace(newFile, newRank, pawn)
       if validity == "Valid":
         if newRank != 1 and newRank != 8:
           theMoveList.append( states.Action(newFile, newRank, pawn, "up one") )
@@ -421,7 +572,7 @@ class AI(BaseAI):
           return theMoveList
       
       # Make sure the space is valid
-      validity = self.CheckValidSpace(newFile, newRank, pawn)
+      validity,reason = self.CheckValidSpace(newFile, newRank, pawn)
       if validity == "Valid":
         theMoveList.append( states.Action(newFile, newRank, pawn, "up two") )
       
@@ -450,7 +601,7 @@ class AI(BaseAI):
       if oldFile is None:
         return None
       new = self.GetFileIndex(oldFile) + diff
-      print(oldFile, diff, new)
+      # print(oldFile, diff, new)
       if new >= 0 and new < len(self.files):
         return new
       else:
@@ -481,10 +632,11 @@ class AI(BaseAI):
     def CheckValidSpace(self, newFile, newRank, movingPiece):
     
       validType = "Valid"
+      capturedPiece = None
       
       # If the space is out of bounds, return False
       if newFile is None or newRank is None:
-        return "Invalid"
+        return "Invalid",capturedPiece
     
       # Make sure we do not move the piece into an occupied space.
       for piece in self.game.pieces:
@@ -492,9 +644,10 @@ class AI(BaseAI):
           # print(piece.owner.id, self.playerAtPlay)
           if piece.owner.id == self.playerAtPlay:
             validType = "Invalid"
-            return validType
+            return validType,capturedPiece
           else:
             validType = "Opponent"
+            capturedPiece = piece.type
 
       # Create a new board to simulate the next turn
       newBoard = []
@@ -511,13 +664,13 @@ class AI(BaseAI):
       for x in range(0,8):
           for y in range(0,8):
             if newBoard[x][y] == self.GetPieceCode(self.pieceDict[self.KING][self.player.id][0]):
-              isCheck,reason = self.CheckIfInCheck(newBoard[:], y, x, newBoard[x][y])
+              isCheck,reason = self.CheckIfUnderAttack(newBoard, y, x, newBoard[x][y])
               # print(reason)
               # If he is in check, return Invalid
               if isCheck is True:
-                return "Invalid"
+                return "Invalid",capturedPiece
               
-      return validType
+      return validType,capturedPiece
       
     # Generate a list of moves by iterating cardinally over the board
     def MoveListCardinal(self, piece, newMoves, step, direction):
@@ -535,14 +688,15 @@ class AI(BaseAI):
           newMove = states.Action(currentFile, self.ChangeRank(currentRank, step), piece)
           
         # Check to make sure this space is valid
-        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
+        validity,reason = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
         
         if validity == "Valid":
           newMoves.append(newMove)
           currentFile = newMove.to[0]
           currentRank = newMove.to[1]
         elif validity == "Opponent":
-          newMove.notes = "capture"
+          newMove.hasCaptured = True
+          newMove.capturedPiece = reason
           newMoves.append(newMove)
           encounteredPiece = True
         else:
@@ -561,14 +715,15 @@ class AI(BaseAI):
         newMove = states.Action(self.ChangeFile(currentFile, step1), self.ChangeRank(currentRank, step2), piece)
        
         # Check to make sure this space is valid
-        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
+        validity,reason = self.CheckValidSpace(newMove.to[0], newMove.to[1], piece)
        
         if validity == "Valid":
           newMoves.append(newMove)
           currentFile = newMove.to[0]
           currentRank = newMove.to[1]
         elif validity == "Opponent":
-          newMove.notes = "capture"
+          newMove.hasCaptured = True
+          newMove.capturedPiece = reason
           newMoves.append(newMove)
           encounteredPiece = True
         else:
@@ -589,10 +744,11 @@ class AI(BaseAI):
     def GenerateKnightMoves(self, knight, theMoveList):
       for move in self.knightMoves:
         newMove = states.Action(self.ChangeFile(knight.file, move[0]), self.ChangeRank(knight.rank, move[1]), knight)
-        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], knight)
+        validity,reason = self.CheckValidSpace(newMove.to[0], newMove.to[1], knight)
         if validity == "Valid" or validity == "Opponent":
           if validity == "Opponent":
-            newMove.notes = "capture"
+            newMove.hasCaptured = True
+            newMove.capturedPiece = reason
           theMoveList.append(newMove)
       return theMoveList
     
@@ -620,10 +776,11 @@ class AI(BaseAI):
     def GenerateKingMoves(self, king, theMoveList):
       for move in self.kingMoves:
         newMove = states.Action(self.ChangeFile(king.file, move[0]), self.ChangeRank(king.rank, move[1]), king)
-        validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], king)
+        validity,reason = self.CheckValidSpace(newMove.to[0], newMove.to[1], king)
         if validity == "Valid" or validity == "Opponent":
           if validity == "Opponent":
-              newMove.notes = "capture"
+            newMove.hasCaptured = True
+            newMove.capturedPiece = reason
           theMoveList.append(newMove)
       theMoveList = self.Castle(theMoveList)
       return theMoveList
@@ -633,7 +790,7 @@ class AI(BaseAI):
       theMoveList = []
       
       self.generators = { }
-      self.currentBoard = board[:]
+      self.currentBoard = board
       self.playerAtPlay = id
       
       for name in self.pieceNames:
@@ -652,7 +809,7 @@ class AI(BaseAI):
         code = code.lower()
       return code
       
-    def GetPieceCode2(self, piece, name, king):
+    def GetPieceCode2(self, piece, name, attacked, friendlyFire=False):
       # Infer the player based on letter case
       # Should return True if we have found the designated enemy 
      
@@ -665,20 +822,27 @@ class AI(BaseAI):
       elif name == self.KNIGHT and self.playerAtPlay == self.player.other_player.id:
         n = 'n'
       
-      # print(piece, king)
-      # p,K : P,k -> check
+      # print(piece, attacked)
       
-      # If the piece is black and the king is white, check!
-      if piece == n.lower() and king == king.upper():
-        print(piece, king)
-        print("Check 1")
-        return True
-        
-      # If the piece is white and the king is black, check!
-      if piece == n.upper() and king == king.lower():
-        print(piece, king)
-        print("Check 2")
-        return True
+      # Friendly fire means we are checking to see if a piece is protected by its own team.
+      # Otherwise check to see if a piece is under attack by the opposing team.
+      if friendlyFire == True:
+        if piece == n.upper() and attacked == attacked.upper():
+          return True
+        if piece == n.lower() and attacked == attacked.lower():
+          return True
+      else:
+        # If the piece is black and the king is white, check!
+        if piece == n.lower() and attacked == attacked.upper():
+          # print(piece, king)
+          # print("Check 1")
+          return True
+          
+        # If the piece is white and the king is black, check!
+        if piece == n.upper() and attacked == attacked.lower():
+          # print(piece, king)
+          # print("Check 2")
+          return True
       
       return False
     
@@ -689,8 +853,11 @@ class AI(BaseAI):
           if abs(self.GetFileIndex(pawn.file) - self.GetFileIndex(self.game.moves[-1].to_file)) == 1:
             if self.game.moves[-1].from_rank == pawn.rank:
               newMove = states.Action(self.game.moves[-1].to_file, self.ChangeRank(self.game.moves[-1].to_rank, 1), pawn, "e.p.")
-              validity = self.CheckValidSpace(newMove.to[0], newMove.to[1], pawn)
+              validity,reason = self.CheckValidSpace(newMove.to[0], newMove.to[1], pawn)
               if validity == "Valid" or validity == "Opponent":
+                if validity == "Opponent":
+                  newMove.hasCaptured == True
+                  newMove.capturedPiece = reason
                 theMoveList.append(newMove)
             
       return theMoveList
@@ -720,15 +887,15 @@ class AI(BaseAI):
       
       # Add queenside castling to the move list if applicable
       if hasCastledQueenside is False:
-        validity1 = self.CheckValidSpace('d', theRank, self.pieceDict[self.KING][self.player.id][0])
-        validity2 = self.CheckValidSpace('c', theRank, self.pieceDict[self.KING][self.player.id][0])
+        validity1,reason = self.CheckValidSpace('d', theRank, self.pieceDict[self.KING][self.player.id][0])
+        validity2,reason = self.CheckValidSpace('c', theRank, self.pieceDict[self.KING][self.player.id][0])
         if validity1 == "Valid" and validity2 == "Valid":
           theMoveList.append( states.Action('c', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0-0") )
       
       # Add kingside castling to the move list if applicable      
       if hasCastledKingside is False:
-        validity1 = self.CheckValidSpace('f', theRank, self.pieceDict[self.KING][self.player.id][0])
-        validity2 = self.CheckValidSpace('g', theRank, self.pieceDict[self.KING][self.player.id][0])
+        validity1,reason = self.CheckValidSpace('f', theRank, self.pieceDict[self.KING][self.player.id][0])
+        validity2,reason = self.CheckValidSpace('g', theRank, self.pieceDict[self.KING][self.player.id][0])
         if validity1 == "Valid" and validity2 == "Valid":
           theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )
           
@@ -754,10 +921,8 @@ class AI(BaseAI):
           currentBoard[piece.rank-1][i] = self.GetPieceCode(piece)
 
         # Create the current game state and make a random valid move
-        print(self.player.id)
-        if self.player.id == 1 or self.player.id == 0:
-          print("number")
         currentState = states.State(currentBoard, self.player.id, None, 0)
+        currentState.turnsToDraw = self.game.turns_to_draw
         self.playerAtPlay = self.player.id
         currentState.actionSet = self.GenerateAllValidMoves(currentBoard, self.player.id)
         # currentState.printBoard()
@@ -772,6 +937,7 @@ class AI(BaseAI):
         # Pick a random move from the list of valid moves for this turn
         if len(currentState.actionSet) > 0:
           IDDLMM = self.IDDLMM(self)
+          print("Turns to stalemate: ", self.game.turns_to_draw)
           bestMove = IDDLMM.Search(currentState, self.player.id) # random.choice(currentState.actionSet)
           # bestMove = random.choice(currentState.actionSet)
         else:
@@ -789,10 +955,13 @@ class AI(BaseAI):
         #for move in currentState.actionSet:
         print(currentState.actionSet)
         
-        if bestMove.promotion is None:
+        if bestMove is None:
+          return True
+        
+        if bestMove.promotedPiece is None:
           bestMove.piece.move(bestMove.to[0], bestMove.to[1])
         else:
-          bestMove.piece.move(bestMove.to[0], bestMove.to[1], bestMove.promotion)
+          bestMove.piece.move(bestMove.to[0], bestMove.to[1], bestMove.promotedPiece)
         
         # self.stateHistory.append( self.Result(bestMove, currentState) )
 

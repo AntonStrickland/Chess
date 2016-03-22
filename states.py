@@ -1,5 +1,5 @@
 class State():
-  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled']
+  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled', 'turnsToDraw']
   
   def __init__(self, board, playerID, actionTaken, utility, castled=False):
     self.board = board
@@ -9,6 +9,7 @@ class State():
     self.stateID = self.assignID()
     self.hasCastled = castled
     self.utility = utility
+    self.turnsToDraw = 100
 
   def assignID(self):
     stateID = ""
@@ -35,15 +36,18 @@ class State():
     return
     
 class Action():
-  __slots__ = ['to', 'frm', 'piece', 'notes', 'promotion']
+  __slots__ = ['to', 'frm', 'piece', 'notes', 'hasCaptured', 'capturedPiece', 'hasPromoted', 'promotedPiece']
   
-  def __init__(self, newFile, newRank, piece, notes="none", promotion=None):
+  def __init__(self, newFile, newRank, piece, notes="none", hasCaptured=False, capturedPiece=None):
     self.to = (newFile, newRank)
     self.frm = (piece.file, piece.rank)
     self.piece = piece
     self.notes = notes
-    self.promotion = promotion
-    
+    self.hasCaptured = hasCaptured
+    self.capturedPiece = capturedPiece
+    self.hasPromoted = False
+    self.promotedPiece = None
+        
   def __repr__(self):
     return self.__str__()
     
@@ -67,9 +71,9 @@ class Action():
         ep = "e.p."
         
       promote = ""
-      if self.promotion is not None:
-        promote = "=" + self.promotion[0]
-        if self.promotion == "Knight":
+      if self.hasPromoted == True and self.promotedPiece is not None:
+        promote = "=" + self.otherPiece[0]
+        if self.otherPiece == "Knight":
           promote = "=" + "N"
       
     return letter + oldTile + " " + letter + capture + newTile + ep + promote
