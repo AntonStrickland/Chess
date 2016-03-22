@@ -152,7 +152,7 @@ class AI(BaseAI):
         
         # Adjust the turns remaining to a draw
         if action.piece.type == self.MoveGenerator.PAWN or action.hasCaptured == True or action.notes == "e.p.":
-          newState.turnsToDraw = 50
+          newState.turnsToDraw = 100
         else:
           newState.turnsToDraw -= 1
         
@@ -235,7 +235,8 @@ class AI(BaseAI):
           return -1*sys.maxsize
           
         # Avoid draw where in 50 moves no pawn has moved or piece captured
-        if state.turnsToDraw <= 0:
+        # print("TurnstoDraw:", state.turnsToDraw)
+        if state.turnsToDraw <= 1:
           return -1*sys.maxsize
           
         # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
@@ -248,47 +249,30 @@ class AI(BaseAI):
         
         u = 0
         
-        '''
+        # States which are further away from a draw are better
+        u += state.turnsToDraw
+
         if state.actionTaken is not None:
           piece = self.MoveGenerator.GetPieceCode(state.actionTaken.piece)
           y = self.MoveGenerator.GetFileIndex(state.actionTaken.to[0])
           x = state.actionTaken.to[1]-1
-          isAttacked,reason = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece)
+          isAttacked,attackingPiece = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece)
           
           # If this piece is under attack by a piece of lesser value, then this is a worse move
           if isAttacked == True:
-            if state.actionTaken.piece.type == self.MoveGenerator.PAWN or state.actionTaken.piece.type == self.MoveGenerator.KING:
-              u -= 8
-            elif state.actionTaken.piece.type == self.MoveGenerator.KNIGHT:
-              u -= 4
-            elif state.actionTaken.piece.type == self.MoveGenerator.BISHOP:
-              u -= 4
-            elif state.actionTaken.piece.type == self.MoveGenerator.ROOK:
-              u -= 2
-            elif state.actionTaken.piece.type == self.MoveGenerator.QUEEN:
-              u -= 1
+            u -= self.PieceValue[attackingPiece[0].lower()] - 1
               
           # If this piece is protected by another team mate, then this is a better move
           isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece, True)
           if isProtected:
-            # print("Protected by", reason)
-            u += 10
+            u += 1
             
           # If this move captures a piece, then this is a better move depending on the type of piece captured
           if state.actionTaken.hasCaptured == True:
-            if state.actionTaken.capturedPiece == self.MoveGenerator.PAWN:
-              u += 1
-            if state.actionTaken.capturedPiece == self.MoveGenerator.KNIGHT:
-              u += 3
-            if state.actionTaken.capturedPiece == self.MoveGenerator.BISHOP:
-              u += 3
-            if state.actionTaken.capturedPiece == self.MoveGenerator.ROOK:
-              u += 5
-            if state.actionTaken.capturedPiece == self.MoveGenerator.QUEEN:
-              u += 10
+            u += 2 * self.PieceValue[state.actionTaken.capturedPiece[0].lower()]
             
           # Prefer moves that go to the center of the board early on
-          if len(self.MoveGenerator.game.moves) < 20:
+          if len(self.MoveGenerator.game.moves) < 12:
             if state.actionTaken.frm[1] == 1 or state.actionTaken.frm[1] == 8:
               u -= 4
             elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
@@ -297,9 +281,11 @@ class AI(BaseAI):
               u -= 2
             elif state.actionTaken.frm[1] == 4 or state.actionTaken.frm[1] == 5:
               u -= 1
-        '''
-      
-        # print("Player id", self.playerID)
+        
+          # Try not to move the king unless necessary
+          if state.actionTaken.piece.type == self.MoveGenerator.KING:
+            u -= 2
+          
         # For every piece on the board, add the piece's value to utility
         for x in range(0, len(state.board)):
           for y in range(0, len(state.board)):
@@ -524,10 +510,16 @@ class AI(BaseAI):
             if newRank != 1 and newRank != 8:
               theMoveList.append( states.Action(newFile, newRank, pawn, True, reason) )
             else:
-              theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.QUEEN))
-              theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.ROOK))
-              theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.BISHOP))
-              theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.KNIGHT))
+              newMove = states.Action(newFile, newRank, pawn)
+              newMove.hasPromoted = True
+              newMove.promotedPiece = self.QUEEN
+              theMoveList.append(newMove)
+              newMove.promotedPiece = self.ROOK
+              theMoveList.append(newMove)
+              newMove.promotedPiece = self.BISHOP
+              theMoveList.append(newMove)
+              newMove.promotedPiece = self.KNIGHT
+              theMoveList.append(newMove)
       return theMoveList
       
     def MovePawnUpOneRank(self, pawn, theMoveList):
@@ -543,11 +535,16 @@ class AI(BaseAI):
         if newRank != 1 and newRank != 8:
           theMoveList.append( states.Action(newFile, newRank, pawn, "up one") )
         else:
-          theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.QUEEN))
-          theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.ROOK))
-          theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.BISHOP))
-          theMoveList.append( states.Action(newFile, newRank, pawn, "promotion", self.KNIGHT))
-        
+          newMove = states.Action(newFile, newRank, pawn)
+          newMove.hasPromoted = True
+          newMove.promotedPiece = self.QUEEN
+          theMoveList.append(newMove)
+          newMove.promotedPiece = self.ROOK
+          theMoveList.append(newMove)
+          newMove.promotedPiece = self.BISHOP
+          theMoveList.append(newMove)
+          newMove.promotedPiece = self.KNIGHT
+          theMoveList.append(newMove)
       return theMoveList
       
     def MovePawnUpTwoRanks(self, pawn, theMoveList):
@@ -862,8 +859,10 @@ class AI(BaseAI):
             
       return theMoveList
 
+    #TODO: Fix some things here
     def Castle(self, theMoveList):
       
+      '''
       # Get the rank for the first row based on the player
       if self.GetRankDirection() == 1:
         theRank = 1
@@ -897,7 +896,7 @@ class AI(BaseAI):
         validity1,reason = self.CheckValidSpace('f', theRank, self.pieceDict[self.KING][self.player.id][0])
         validity2,reason = self.CheckValidSpace('g', theRank, self.pieceDict[self.KING][self.player.id][0])
         if validity1 == "Valid" and validity2 == "Valid":
-          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )
+          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )'''
           
       return theMoveList
             

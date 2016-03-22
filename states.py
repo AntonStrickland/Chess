@@ -72,8 +72,8 @@ class Action():
         
       promote = ""
       if self.hasPromoted == True and self.promotedPiece is not None:
-        promote = "=" + self.otherPiece[0]
-        if self.otherPiece == "Knight":
+        promote = "=" + self.promotedPiece[0]
+        if self.promotedPiece == "Knight":
           promote = "=" + "N"
       
     return letter + oldTile + " " + letter + capture + newTile + ep + promote
