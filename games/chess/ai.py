@@ -37,7 +37,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.startTime = self.player.time_remaining
-        self.randomSeed = datetime.datetime.now()
+        self.randomSeed = 1 # datetime.datetime.now()
         
         self.playerAtPlay = self.player.id
         
@@ -218,7 +218,7 @@ class AI(BaseAI):
           validity,reason = self.CheckValidSpace(newFile, newRank, pawn)
           if validity == "Opponent":
             if newRank != 1 and newRank != 8:
-              theMoveList.append( states.Action(newFile, newRank, pawn, True, reason) )
+              theMoveList.append( states.Action(newFile, newRank, pawn, None, True, reason) )
             else:
               newMove = states.Action(newFile, newRank, pawn)
               newMove.hasPromoted = True
@@ -367,15 +367,22 @@ class AI(BaseAI):
       newBoard[movingPiece.rank-1][self.GetFileIndex(movingPiece.file)] = '.'
       newBoard[newRank-1][self.GetFileIndex(newFile)] = self.GetPieceCode(movingPiece)
       
+      isCheck = False
+      
       # Look for the king's new position and see if he is in check or not (with a reason why)
       for x in range(0,8):
           for y in range(0,8):
             if newBoard[x][y] == self.GetPieceCode(self.pieceDict[self.KING][self.player.id][0]):
               isCheck,reason = self.CheckIfUnderAttack(newBoard, y, x, newBoard[x][y])
               # print(reason)
-              # If he is in check, return Invalid
-              if isCheck is True:
-                return "Invalid",capturedPiece
+
+      # Unapply the move
+      # self.currentBoard[newRank-1][self.GetFileIndex(newFile)] = previousPiece
+      # self.currentBoard[movingPiece.rank-1][self.GetFileIndex(movingPiece.file)] = self.GetPieceCode(movingPiece)
+      
+      # If he is in check, return Invalid
+      if isCheck is True:
+        return "Invalid",capturedPiece
               
       return validType,capturedPiece
       
@@ -571,7 +578,7 @@ class AI(BaseAI):
 
     #TODO: Fix some things here
     def Castle(self, theMoveList):
-      
+      '''
       # Get the rank for the first row based on the player
       if self.GetRankDirection() == 1:
         theRank = 1
@@ -605,7 +612,7 @@ class AI(BaseAI):
         validity1,reason = self.CheckValidSpace('f', theRank, self.pieceDict[self.KING][self.player.id][0])
         validity2,reason = self.CheckValidSpace('g', theRank, self.pieceDict[self.KING][self.player.id][0])
         if validity1 == "Valid" and validity2 == "Valid":
-          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )
+          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )'''
           
       return theMoveList
             

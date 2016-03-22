@@ -1,5 +1,5 @@
 class State():
-  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled', 'turnsToDraw']
+  __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled', 'turnsToDraw', 'previousPiece']
   
   def __init__(self, board, playerID, actionTaken, utility, castled=False):
     self.board = board
@@ -10,6 +10,7 @@ class State():
     self.hasCastled = castled
     self.utility = utility
     self.turnsToDraw = 100
+    self.previousPiece = None
 
   def assignID(self):
     stateID = ""
@@ -64,7 +65,7 @@ class Action():
       return letter + oldTile + " " + self.notes
     else:
       capture = ""
-      if self.notes == "capture":
+      if self.hasCaptured == True:
         capture = "x"
       ep = ""
       if self.notes == "e.p.":

@@ -22,8 +22,9 @@ class TLIDABDLMM():
     
   def Search(self, rootNode, id):
     # Test with a depth limit of 3
+    rootNode.printBoard()
     self.playerID = id
-    depthLimit = 4
+    depthLimit = 2
     for depth in range(0,depthLimit):
       # print("Current Depth:", depth)
       self.totalNodes = 1
@@ -45,6 +46,7 @@ class TLIDABDLMM():
     a = None
     for action in initialState.actionSet:
       mm = self.MinValue(self.Result(initialState, action), depth-1, alpha, beta)
+      # self.UnapplyMove(initialState, action)
       v = max(v, mm)
       if v > prev:
         a = action
@@ -75,6 +77,7 @@ class TLIDABDLMM():
     v = sys.maxsize
     for action in state.actionSet:
       v = min(v, self.MaxValue(self.Result(state, action), depth-1, alpha, beta))
+      # self.UnapplyMove(state, action)
       if v <= alpha:
         # print("Prune min")
         return v
@@ -99,6 +102,7 @@ class TLIDABDLMM():
     v = -1*sys.maxsize
     for action in state.actionSet:
       v = max(v, self.MinValue(self.Result(state, action), depth-1, alpha, beta))
+      # self.UnapplyMove(state, action)
       if v >= beta:
         # print("Prune max")
         return v
@@ -135,6 +139,7 @@ class TLIDABDLMM():
   # Returns a new state when given an action and a current state
   def Result(self, state, action):
   
+    
     # Create a new board to simulate the next turn
     newBoard = []
     for x in range(0, 8):
@@ -142,7 +147,13 @@ class TLIDABDLMM():
       for y in range(0, 8):
         newBoard[x].append(state.board[x][y])
     
+    '''
     # Apply the move to the board
+    state.previousPiece = state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])]
+    state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
+    state.board[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)'''
+
+    state.previousPiece = state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])]
     newBoard[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
     newBoard[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)
     
@@ -157,6 +168,12 @@ class TLIDABDLMM():
     
     newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newBoard, self.MoveGenerator.playerAtPlay)
     return newState
+    
+  def UnapplyMove(self, state, action):
+    # Unapply the move to the board
+    state.board[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = state.previousPiece
+    state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = self.MoveGenerator.GetPieceCode(action.piece)
+    return
     
   # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
   def IsNotEnoughPieces(self, state):
@@ -255,30 +272,27 @@ class TLIDABDLMM():
       piece = self.MoveGenerator.GetPieceCode(state.actionTaken.piece)
       y = self.MoveGenerator.GetFileIndex(state.actionTaken.to[0])
       x = state.actionTaken.to[1]-1
-      isAttacked,attackingPiece = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece)
+      isAttacked,attackingPiece = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece)
       
-      # If this piece is under attack by a piece of lesser value, then this is a worse move
+      # If this piece is under attack by a piece, then this is a worse move
       if isAttacked == True:
-        u -= self.PieceValue[attackingPiece[0].lower()] - 1
+        print("atk",u)
+        u -= 4 * self.PieceValue[state.actionTaken.piece.type[0].lower()]
           
       # If this piece is protected by another team mate, then this is a better move
-      isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board[:], y, x, piece, True)
+      isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece, True)
       if isProtected:
         u += 1
         
       # If this move captures a piece, then this is a better move depending on the type of piece captured
       if state.actionTaken.hasCaptured == True:
-        u += 2 * self.PieceValue[state.actionTaken.capturedPiece[0].lower()]
+        u += 4 * self.PieceValue[state.actionTaken.capturedPiece[0].lower()]
         
       # Prefer moves that go to the center of the board early on
       if len(self.MoveGenerator.game.moves) < 12:
         if state.actionTaken.frm[1] == 1 or state.actionTaken.frm[1] == 8:
-          u -= 4
-        elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
-          u -= 3
-        elif state.actionTaken.frm[1] == 3 or state.actionTaken.frm[1] == 6:
           u -= 2
-        elif state.actionTaken.frm[1] == 4 or state.actionTaken.frm[1] == 5:
+        elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
           u -= 1
     
       # Try not to move the king unless necessary
@@ -296,7 +310,10 @@ class TLIDABDLMM():
         if state.board[x][y] == theirKing:
           isCheck,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, state.board[x][y])
           if isCheck == True:
-            u += 100
+            if isAttacked == False:
+              u += 100
+            elif isProtected == True:
+              u += 150
             
         if self.playerID == "1":
           # If we are looking at a lowercase piece and we are black
@@ -311,4 +328,6 @@ class TLIDABDLMM():
           else:
             u -= self.PieceValue[state.board[x][y]]  
     
+    if state.actionTaken is not None:
+      print(u, state.actionTaken)
     return u
