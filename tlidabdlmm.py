@@ -6,11 +6,12 @@ import random
 
 class TLIDABDLMM():
 
-  __slots__ = ['PieceValue', 'MoveGenerator', 'totalNodes', 'actionSet', 'playerID']
+  __slots__ = ['PieceValue', 'MoveGenerator', 'totalNodes', 'actionSet', 'playerID', 'StartingTime']
 
-  def __init__(self, generator):
+  def __init__(self, generator, time):
     self.totalNodes = 3
     self.MoveGenerator = generator
+    self.StartingTime = time
     self.PieceValue = {}
     self.PieceValue['.'] = 0
     self.PieceValue['p'] = 1
@@ -25,12 +26,15 @@ class TLIDABDLMM():
     rootNode.printBoard()
     self.playerID = id
     depthLimit = 2
+    print(self.StartingTime)
     for depth in range(0,depthLimit):
       # print("Current Depth:", depth)
       self.totalNodes = 1
       alpha = -1*sys.maxsize
       beta = sys.maxsize
       result = self.MiniMaxDecision(rootNode, depth, alpha, beta)
+      if self.MoveGenerator.player.time_remaining <= self.StartingTime:
+        return result
       # print(self.totalNodes)
     return result
     
@@ -276,8 +280,15 @@ class TLIDABDLMM():
       
       # If this piece is under attack by a piece, then this is a worse move
       if isAttacked == True:
-        print("atk",u)
-        u -= 4 * self.PieceValue[state.actionTaken.piece.type[0].lower()]
+        u -= 4 * self.PieceValue[piece[0].lower()]
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.QUEEN:
+          u -= 20
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.ROOK:
+          u -= 10
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.BISHOP:
+          u -= 5
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.KNIGHT:
+          u -= 5
           
       # If this piece is protected by another team mate, then this is a better move
       isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece, True)
@@ -286,7 +297,11 @@ class TLIDABDLMM():
         
       # If this move captures a piece, then this is a better move depending on the type of piece captured
       if state.actionTaken.hasCaptured == True:
-        u += 4 * self.PieceValue[state.actionTaken.capturedPiece[0].lower()]
+        captured = state.actionTaken.capturedPiece
+        if captured == self.MoveGenerator.KNIGHT:
+          captured = "NIGHT"
+        u += 4 * self.PieceValue[captured[0].lower()]
+        # print("Capture", u, 4 * self.PieceValue[captured[0].lower()])
         
       # Prefer moves that go to the center of the board early on
       if len(self.MoveGenerator.game.moves) < 12:
@@ -310,10 +325,12 @@ class TLIDABDLMM():
         if state.board[x][y] == theirKing:
           isCheck,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, state.board[x][y])
           if isCheck == True:
+            # print("is check!")
             if isAttacked == False:
-              u += 100
+              u += 4
             elif isProtected == True:
-              u += 150
+              u += 6
+            # print(u)
             
         if self.playerID == "1":
           # If we are looking at a lowercase piece and we are black

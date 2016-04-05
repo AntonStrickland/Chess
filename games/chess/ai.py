@@ -37,7 +37,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.startTime = self.player.time_remaining
-        self.randomSeed = 1 # datetime.datetime.now()
+        self.randomSeed = 5 # datetime.datetime.now()
         
         self.playerAtPlay = self.player.id
         
@@ -645,13 +645,11 @@ class AI(BaseAI):
         # print("Board", size.getsize(currentBoard))
         # print("State", size.getsize(currentState))
         
-        if len(self.game.moves) > 0:
-          print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
-          print("Time Remaining: " + str(self.player.time_remaining/1000000000) + " sec")
+        
         
         # Pick a random move from the list of valid moves for this turn
         if len(currentState.actionSet) > 0:
-          minimax = tlidabdlmm.TLIDABDLMM(self)
+          minimax = tlidabdlmm.TLIDABDLMM(self, self.player.time_remaining*0.5)
           bestMove = minimax.Search(currentState, self.player.id) # random.choice(currentState.actionSet)
           # print("Turns to stalemate: ", self.game.turns_to_draw)
           # bestMove = random.choice(currentState.actionSet)
@@ -662,6 +660,9 @@ class AI(BaseAI):
         print("-----")
         print("Turn " + str(self.game.current_turn))
         print("-----")
+        if len(self.game.moves) > 0:
+          print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
+          print("Time Remaining: " + str(self.player.time_remaining/1000000000) + " sec")
         print(currentState.actionSet)
         
         # Get a list of moves for the randomly chosen piece
@@ -677,7 +678,7 @@ class AI(BaseAI):
         if bestMove is None:
           print("There are no moves.")
           return True
-        
+        print(bestMove)
         if bestMove.promotedPiece is None:
           bestMove.piece.move(bestMove.to[0], bestMove.to[1])
         else:
