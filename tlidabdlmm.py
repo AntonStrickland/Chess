@@ -1,17 +1,19 @@
 #Name: Anton Strickland
-#CS5400 Game Project 2
+#CS5400 Game Project 3
 import sys
 import states
 import random
+import time
 
 class TLIDABDLMM():
 
-  __slots__ = ['PieceValue', 'MoveGenerator', 'totalNodes', 'actionSet', 'playerID', 'StartingTime']
+  __slots__ = ['PieceValue', 'MoveGenerator', 'totalNodes', 'actionSet', 'playerID', 'startTime', 'timeLimit', 'TranspositionTable']
 
-  def __init__(self, generator, time):
+  def __init__(self, generator, t):
     self.totalNodes = 3
     self.MoveGenerator = generator
-    self.StartingTime = time
+    self.startTime = 0
+    self.timeLimit = t
     self.PieceValue = {}
     self.PieceValue['.'] = 0
     self.PieceValue['p'] = 1
@@ -20,28 +22,39 @@ class TLIDABDLMM():
     self.PieceValue['r'] = 5
     self.PieceValue['q'] = 9
     self.PieceValue['k'] = 100
+    self.TranspositionTable = {}
     
   def Search(self, rootNode, id):
     # Test with a depth limit of 3
-    rootNode.printBoard()
+    # rootNode.printBoard()
     self.playerID = id
+    self.startTime = time.time()
     depthLimit = 2
-    print(self.StartingTime)
+    bestFound = None
+    bestU = -1*sys.maxsize
     for depth in range(0,depthLimit):
       # print("Current Depth:", depth)
       self.totalNodes = 1
       alpha = -1*sys.maxsize
       beta = sys.maxsize
-      result = self.MiniMaxDecision(rootNode, depth, alpha, beta)
-      if self.MoveGenerator.player.time_remaining <= self.StartingTime:
-        return result
+      result,u = self.MiniMaxDecision(rootNode, depth, alpha, beta)
+      
+      if u > bestU:
+        bestFound = result
+        
+      if time.time() - self.startTime >= self.timeLimit/1000000000:
+        # print("Best action found: ", bestFound)
+        return bestFound
+        
+      # print("Best action found: ", bestFound)
       # print(self.totalNodes)
-    return result
+    return bestFound
     
   def MiniMaxDecision(self, initialState, depth, alpha, beta):
-    # initialState.printBoard()
-    if self.TerminalTest(initialState, depth):
-      return self.Utility(initialState)
+  
+    terminalTest = self.TerminalTest(depth, initialState)
+    if terminalTest is not None:
+      return terminalTest, -1*sys.maxsize
       
     # print("MINIMAX: ", depth, initialState.actionTaken, len(initialState.actionSet))
     # print(initialState.actionSet)
@@ -61,20 +74,14 @@ class TLIDABDLMM():
         if random.random() > 0.5:
           a = action
           # print("Random switch! New Utility: ", v, "Action: ", a)
-    print("Depth: ", depth, "Utility: ", v, "Action Taken: ", a)
-    return a
-    
+    # print("Depth: ", depth, "Utility: ", v, "Action: ", a)
+    return a,v
+
   def MinValue(self, state, depth, alpha, beta):
     
-    # state.printBoard()
-    '''if self.TerminalTest(state, depth):
-      u = self.Utility(state)
-      return u'''
-      
-    if depth <= 0:
-      return self.Utility(state)
-    if self.CheckIfInCheckMate(state):
-      return sys.maxsize
+    terminalTest = self.TerminalTest(depth, state)
+    if terminalTest is not None:
+      return terminalTest
       
     # print("MIN: ", depth, state.actionTaken, len(state.actionSet))
     # print(state.actionSet)
@@ -83,24 +90,17 @@ class TLIDABDLMM():
       v = min(v, self.MaxValue(self.Result(state, action), depth-1, alpha, beta))
       # self.UnapplyMove(state, action)
       if v <= alpha:
-        # print("Prune min")
+        # print("Prune min", alpha, v)
         return v
       beta = min(beta, v)
     return v
     
   def MaxValue(self, state, depth, alpha, beta):
     
-    # state.printBoard()
-    '''
-    if self.TerminalTest(state, depth):
-      u = self.Utility(state)
-      return u'''
-      
-    if depth <= 0:
-      return self.Utility(state)
-    if self.CheckIfInCheckMate(state):
-      return sys.maxsize
-      
+    terminalTest = self.TerminalTest(depth, state)
+    if terminalTest is not None:
+      return terminalTest
+
     # print("MAX: ", depth, state.actionTaken, len(state.actionSet))
     # print(state.actionSet)
     v = -1*sys.maxsize
@@ -108,16 +108,47 @@ class TLIDABDLMM():
       v = max(v, self.MinValue(self.Result(state, action), depth-1, alpha, beta))
       # self.UnapplyMove(state, action)
       if v >= beta:
-        # print("Prune max")
+        # print("Prune max", beta, v)
         return v
       alpha = max(alpha, v)
     return v
-
-  def TerminalTest(self, state, depth):
-    # Check to see if we have reached the depth limit
+    
+    
+  def TerminalTest(self, depth, state):
+  
+    # Time limit reached?
+    if time.time() - self.startTime >= self.timeLimit/1000000000:
+      # print("time limit reached!", time.time() - self.startTime, self.timeLimit/1000000000)
+      return -1*sys.maxsize
+        
     if depth <= 0:
-      return True
-    return self.CheckIfInCheckMate(state)
+      if state.stateID not in self.TranspositionTable:
+        self.TranspositionTable[state.stateID] = self.Utility(state)
+      return self.TranspositionTable[state.stateID]
+      
+    if self.CheckIfInCheckMate(state):
+      if state.stateID not in self.TranspositionTable:
+        self.TranspositionTable[state.stateID] = sys.maxsize
+      return self.TranspositionTable[state.stateID]
+      
+    # Avoid draw where you have no moves left but not in check (stalemate)
+    if len(state.actionSet) == 0:
+      return -1*sys.maxsize
+      
+    # Avoid draw where in 50 moves no pawn has moved or piece captured
+    # print("TurnstoDraw:", state.turnsToDraw)
+    if state.turnsToDraw <= 1:
+      return -1*sys.maxsize
+      
+    # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
+    if self.IsNotEnoughPieces(state):
+      return -1*sys.maxsize
+      
+    # Avoid draw where threefold repetition
+    if self.IsThreeFoldRepetition(state):
+      return -1*sys.maxsize
+      
+    return None
     
   def CheckIfInCheckMate(self, state):
     # If this is the opponent's turn, then check if they are in check and have no moves available
@@ -162,7 +193,7 @@ class TLIDABDLMM():
     newBoard[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)
     
     self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
-    newState = states.State(newBoard, self.MoveGenerator.playerAtPlay, action, self.Utility(state))
+    newState = states.State(newBoard, self.MoveGenerator.playerAtPlay, action, self.TranspositionTable[state.stateID])
     
     # Adjust the turns remaining to a draw
     if action.piece.type == self.MoveGenerator.PAWN or action.hasCaptured == True or action.notes == "e.p.":
@@ -245,93 +276,15 @@ class TLIDABDLMM():
     return False
 
   def Utility(self, state):
-  
-    # If this is a checkmate state then return the best possible utility
-    #if state.utility >= 8000:
-    #  return state.utility
-      
-    # Avoid draw where you have no moves left but not in check (stalemate)
-    if len(state.actionSet) == 0:
-      return -1*sys.maxsize
-      
-    # Avoid draw where in 50 moves no pawn has moved or piece captured
-    # print("TurnstoDraw:", state.turnsToDraw)
-    if state.turnsToDraw <= 1:
-      return -1*sys.maxsize
-      
-    # Avoid draw where not enough pieces (K vs. K, K vs. KB, K vs. KN, KB vs. KB)   
-    if self.IsNotEnoughPieces(state):
-      return -1*sys.maxsize
-      
-    # Avoid draw where threefold repetition
-    if self.IsThreeFoldRepetition(state):
-      return -1*sys.maxsize
-    
+ 
     u = 0
     
     # States which are further away from a draw are better
     u += state.turnsToDraw
-
-    if state.actionTaken is not None:
-      piece = self.MoveGenerator.GetPieceCode(state.actionTaken.piece)
-      y = self.MoveGenerator.GetFileIndex(state.actionTaken.to[0])
-      x = state.actionTaken.to[1]-1
-      isAttacked,attackingPiece = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece)
-      
-      # If this piece is under attack by a piece, then this is a worse move
-      if isAttacked == True:
-        u -= 4 * self.PieceValue[piece[0].lower()]
-        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.QUEEN:
-          u -= 20
-        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.ROOK:
-          u -= 10
-        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.BISHOP:
-          u -= 5
-        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.KNIGHT:
-          u -= 5
-          
-      # If this piece is protected by another team mate, then this is a better move
-      isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece, True)
-      if isProtected:
-        u += 1
-        
-      # If this move captures a piece, then this is a better move depending on the type of piece captured
-      if state.actionTaken.hasCaptured == True:
-        captured = state.actionTaken.capturedPiece
-        if captured == self.MoveGenerator.KNIGHT:
-          captured = "NIGHT"
-        u += 4 * self.PieceValue[captured[0].lower()]
-        # print("Capture", u, 4 * self.PieceValue[captured[0].lower()])
-        
-      # Prefer moves that go to the center of the board early on
-      if len(self.MoveGenerator.game.moves) < 12:
-        if state.actionTaken.frm[1] == 1 or state.actionTaken.frm[1] == 8:
-          u -= 2
-        elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
-          u -= 1
-    
-      # Try not to move the king unless necessary
-      if state.actionTaken.piece.type == self.MoveGenerator.KING:
-        u -= 5
-        
-    kingCode = self.MoveGenerator.pieceDict[self.MoveGenerator.KING][self.MoveGenerator.player.other_player.id][0]
-    theirKing = self.MoveGenerator.GetPieceCode(kingCode)
-      
+         
     # For every piece on the board, add the piece's value to utility
     for x in range(0, len(state.board)):
       for y in range(0, len(state.board)):
-      
-        # Check to see if we are putting the other king in check
-        if state.board[x][y] == theirKing:
-          isCheck,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, state.board[x][y])
-          if isCheck == True:
-            # print("is check!")
-            if isAttacked == False:
-              u += 4
-            elif isProtected == True:
-              u += 6
-            # print(u)
-            
         if self.playerID == "1":
           # If we are looking at a lowercase piece and we are black
           if state.board[x][y].islower():
@@ -345,6 +298,6 @@ class TLIDABDLMM():
           else:
             u -= self.PieceValue[state.board[x][y]]  
     
-    if state.actionTaken is not None:
-      print(u, state.actionTaken)
+    #if state.actionTaken is not None and u > 98:
+    #  print(u, state.actionTaken)
     return u
