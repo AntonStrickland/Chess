@@ -37,7 +37,7 @@ class State():
     return
     
 class Action():
-  __slots__ = ['to', 'frm', 'piece', 'notes', 'hasCaptured', 'capturedPiece', 'hasPromoted', 'promotedPiece']
+  __slots__ = ['to', 'frm', 'piece', 'notes', 'hasCaptured', 'capturedPiece', 'hasPromoted', 'promotedPiece', 'id', 'id2', 'historyValue']
   
   def __init__(self, newFile, newRank, piece, notes="none", hasCaptured=False, capturedPiece=None):
     self.to = (newFile, newRank)
@@ -48,11 +48,14 @@ class Action():
     self.capturedPiece = capturedPiece
     self.hasPromoted = False
     self.promotedPiece = None
+    self.id = self.assignID()
+    self.id2 = self.id.replace(" ","-")
+    self.historyValue = 0
         
   def __repr__(self):
     return self.__str__()
     
-  def __str__(self):
+  def assignID(self):
     oldTile = (str(self.frm[0]) + str(self.frm[1]))
     newTile = (str(self.to[0]) + str(self.to[1]))
     letter = self.piece.type[0]
@@ -78,3 +81,7 @@ class Action():
           promote = "=" + "N"
       
     return letter + oldTile + " " + letter + capture + newTile + ep + promote
+    
+  def __str__(self):
+    return self.id
+    

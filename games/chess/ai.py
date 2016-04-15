@@ -1,11 +1,12 @@
 #Name: Anton Strickland
-#CS5400 Game Project 2
+#CS5400 Game Project 3
 
 from joueur.base_ai import BaseAI
 import random
 import datetime
 # import iddlmm
-import tlidabdlmm
+# import tlidabdlmm
+import tlhtqsidabdlmm
 import sys
 import states
 # import size
@@ -37,7 +38,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.startTime = self.player.time_remaining
-        self.randomSeed = 5 # datetime.datetime.now()
+        self.randomSeed = 9 # datetime.datetime.now()
         
         self.playerAtPlay = self.player.id
         
@@ -46,7 +47,7 @@ class AI(BaseAI):
         self.pieceNames = [self.PAWN, self.KNIGHT, self.BISHOP, self.ROOK, self.QUEEN, self.KING]
         
         self.currentBoard = []
-        self.stateHistory = []
+        self.historyTable = {}
         
         for i in range(0,8):
           self.currentBoard.append([])
@@ -578,7 +579,7 @@ class AI(BaseAI):
 
     #TODO: Fix some things here
     def Castle(self, theMoveList):
-      '''
+      
       # Get the rank for the first row based on the player
       if self.GetRankDirection() == 1:
         theRank = 1
@@ -612,7 +613,7 @@ class AI(BaseAI):
         validity1,reason = self.CheckValidSpace('f', theRank, self.pieceDict[self.KING][self.player.id][0])
         validity2,reason = self.CheckValidSpace('g', theRank, self.pieceDict[self.KING][self.player.id][0])
         if validity1 == "Valid" and validity2 == "Valid":
-          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )'''
+          theMoveList.append( states.Action('g', theRank, self.pieceDict[self.KING][self.player.id][0], "0-0") )
           
       return theMoveList
             
@@ -623,7 +624,10 @@ class AI(BaseAI):
         Returns:
             bool: Represents if you want to end your turn. True means end your turn, False means to keep your turn going and re-call this function.
         """
-        
+        print("-----")
+        print("Turn " + str(self.game.current_turn))
+        print("-----")
+
         # Create the current board
         currentBoard = []
         for i in range(0,8):
@@ -645,11 +649,9 @@ class AI(BaseAI):
         # print("Board", size.getsize(currentBoard))
         # print("State", size.getsize(currentState))
         
-        
-        
         # Pick a random move from the list of valid moves for this turn
         if len(currentState.actionSet) > 0:
-          minimax = tlidabdlmm.TLIDABDLMM(self, self.player.time_remaining*0.5)
+          minimax = tlhtqsidabdlmm.TLHTQSIDABDLMM(self, self.player.time_remaining*0.1, self.historyTable)
           bestMove = minimax.Search(currentState, self.player.id) # random.choice(currentState.actionSet)
           # print("Turns to stalemate: ", self.game.turns_to_draw)
           # bestMove = random.choice(currentState.actionSet)
@@ -657,35 +659,30 @@ class AI(BaseAI):
           print("There are no moves.")
           return True
         
-        print("-----")
-        print("Turn " + str(self.game.current_turn))
-        print("-----")
-        if len(self.game.moves) > 0:
-          print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
-          print("Time Remaining: " + str(self.player.time_remaining/1000000000) + " sec")
-        print(currentState.actionSet)
+
+        #if len(self.game.moves) > 0:
+        #  print("Opponent's Last Move: '" + self.game.moves[-1].san + "'")
+        #  print("Time Remaining: " + str(self.player.time_remaining/1000000000) + " sec")
+        # print(currentState.actionSet)
         
-        # Get a list of moves for the randomly chosen piece
-        '''
+        # Get a list of moves for the chosen piece
         bestMoveList = []
         for move in currentState.actionSet:
           if move.piece == bestMove.piece:
             bestMoveList.append(move)
         
-        for move in bestMoveList:
-          print(move)'''
+        #for move in bestMoveList:
+        #  print(move)
              
         if bestMove is None:
           print("There are no moves.")
           return True
-        print(bestMove)
+          
+       #  print(bestMove)
         if bestMove.promotedPiece is None:
           bestMove.piece.move(bestMove.to[0], bestMove.to[1])
         else:
           bestMove.piece.move(bestMove.to[0], bestMove.to[1], bestMove.promotedPiece)
         
-        # self.stateHistory.append( self.Result(bestMove, currentState) )
-
-       
         # print("End of my turn.")
         return True # to signify we are done with our turn.
