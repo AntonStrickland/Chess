@@ -9,7 +9,7 @@ class TLHTQSIDABDLMM():
 
   __slots__ = ['PieceValue', 'MoveGenerator', 'totalNodes', 'actionSet', 'playerID', 'startTime', 'timeLimit', 'TranspositionTable', 'HistoryTable']
 
-  def __init__(self, generator, t, history):
+  def __init__(self, generator, t, transp, history):
     self.totalNodes = 3
     self.MoveGenerator = generator
     self.startTime = 0
@@ -22,7 +22,7 @@ class TLHTQSIDABDLMM():
     self.PieceValue['r'] = 5
     self.PieceValue['q'] = 9
     self.PieceValue['k'] = 1
-    self.TranspositionTable = {}
+    self.TranspositionTable = transp
     self.HistoryTable = history
     
   def Search(self, rootNode, id):
@@ -30,7 +30,7 @@ class TLHTQSIDABDLMM():
     # rootNode.printBoard()
     self.playerID = id
     self.startTime = time.time()
-    depthLimit = 2
+    depthLimit = 4
     bestFound = None
     bestU = -1*sys.maxsize
     for depth in range(0,depthLimit):
@@ -50,16 +50,16 @@ class TLHTQSIDABDLMM():
     
   def MiniMaxDecision(self, state, depth, alpha, beta):
   
-    terminalTest = self.TerminalTest(depth, state)
-    if terminalTest is not None:
-      return terminalTest, -1*sys.maxsize
-      
+    #terminalTest = self.TerminalTest(depth, state)
+    #if terminalTest is not None:
+    #  return terminalTest, -1*sys.maxsize
+    
     v = -1*sys.maxsize
     prev = v
     a = None
     sortedActions = self.SortActions(state.actionSet)
     
-    for action in state.actionSet:
+    for action in sortedActions:
       mm = self.MinValue(self.Result(state, action), depth-1, alpha, beta)
       self.UnapplyMove(state, action)
       v = max(v, mm)
@@ -68,18 +68,18 @@ class TLHTQSIDABDLMM():
         prev = v
       elif mm == prev:
         # 50% chance to choose current action if same utility as the best
-        if random.random() > 0.5:
+        if random.random() > 1.0:
           a = action
     self.UpdateHistoryTable(a)
     print(a, v)
     return a,v
 
   def MinValue(self, state, depth, alpha, beta):
-    
     terminalTest = self.TerminalTest(depth, state)
     if terminalTest is not None:
+      # print("util", state.actionTaken, terminalTest)
       return terminalTest
-    
+      
     v = sys.maxsize
     sortedActions = self.SortActions(state.actionSet)
     
@@ -118,6 +118,10 @@ class TLHTQSIDABDLMM():
     action.historyValue = self.HistoryTable[key]
     # print(key, self.HistoryTable[key])
     
+  def UpdateTranspositionTable(self, state):
+    self.TranspositionTable[state.stateID] = self.TranspositionTable.get(state.stateID, self.Utility(state))
+  
+  
   def SortActions(self, actionSet):
     return sorted(actionSet, key=lambda x: x.historyValue, reverse=True)
     
@@ -129,10 +133,9 @@ class TLHTQSIDABDLMM():
       return -1*sys.maxsize
         
     if depth <= 0:
-      if state.stateID not in self.TranspositionTable:
-        self.TranspositionTable[state.stateID] = self.Utility(state)
+      self.TranspositionTable[state.stateID] = self.TranspositionTable.get(state.stateID, self.Utility(state))
       return self.TranspositionTable[state.stateID]
-      
+
     if self.CheckIfInCheckMate(state):
       if state.stateID not in self.TranspositionTable:
         self.TranspositionTable[state.stateID] = sys.maxsize
@@ -218,7 +221,12 @@ class TLHTQSIDABDLMM():
     self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
     
     # Generate and return the new state
-    return states.State(state.board, self.MoveGenerator.playerAtPlay, action, self.TranspositionTable[state.stateID])
+    newState = states.State(state.board, self.MoveGenerator.playerAtPlay, action)
+    if state.stateID not in self.TranspositionTable:
+        self.TranspositionTable[state.stateID] = self.Utility(state)
+    newState.utility = self.TranspositionTable[state.stateID]
+    
+    return newState
     
   def UnapplyMove(self, state, action):
     # Unapply the move to the board
@@ -297,6 +305,10 @@ class TLHTQSIDABDLMM():
     
     # States which are further away from a draw are better
     # u += state.turnsToDraw
+    
+    if state.actionTaken is not None:
+      if state.actionTaken.hasCaptured is True:
+        u += 90
          
     # For every piece on the board, add the piece's value to utility
     for x in range(0, len(state.board)):
@@ -315,5 +327,6 @@ class TLHTQSIDABDLMM():
             u -= self.PieceValue[state.board[x][y]]  
     
     #if state.actionTaken is not None and u > 98:
-    #  print(u, state.actionTaken)
+    #print(u)
+    #state.printBoard()
     return u

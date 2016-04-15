@@ -1,7 +1,7 @@
 class State():
   __slots__ = ['board', 'actionTaken', 'actionSet', 'playerID', 'stateID', 'utility', 'hasCastled', 'turnsToDraw', 'previousPiece']
   
-  def __init__(self, board, playerID, actionTaken, utility, castled=False):
+  def __init__(self, board, playerID, actionTaken, utility=0, castled=False):
     self.board = board
     self.actionTaken = actionTaken
     self.playerID = playerID

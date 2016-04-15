@@ -40,6 +40,8 @@ class AI(BaseAI):
         self.startTime = self.player.time_remaining
         self.randomSeed = 9 # datetime.datetime.now()
         
+        
+        self.promotedPreviousMove = False
         self.playerAtPlay = self.player.id
         
         random.seed(self.randomSeed)
@@ -47,6 +49,7 @@ class AI(BaseAI):
         self.pieceNames = [self.PAWN, self.KNIGHT, self.BISHOP, self.ROOK, self.QUEEN, self.KING]
         
         self.currentBoard = []
+        self.transpTable = {}
         self.historyTable = {}
         
         for i in range(0,8):
@@ -627,6 +630,15 @@ class AI(BaseAI):
         print("-----")
         print("Turn " + str(self.game.current_turn))
         print("-----")
+        
+        # If we promoted a piece on the last move, add that piece to our list of pieces
+        if self.promotedPreviousMove is True:
+          for name in self.pieceNames:
+            self.pieceDict[name] = {
+              self.player.id: [piece for piece in self.player.pieces if piece.type == name], 
+              self.player.other_player.id: [piece for piece in self.player.other_player.pieces if piece.type == name]
+            }
+          self.promotedPreviousMove = False
 
         # Create the current board
         currentBoard = []
@@ -651,7 +663,7 @@ class AI(BaseAI):
         
         # Pick a random move from the list of valid moves for this turn
         if len(currentState.actionSet) > 0:
-          minimax = tlhtqsidabdlmm.TLHTQSIDABDLMM(self, self.player.time_remaining*0.1, self.historyTable)
+          minimax = tlhtqsidabdlmm.TLHTQSIDABDLMM(self, self.player.time_remaining*0.1, self.transpTable, self.historyTable)
           bestMove = minimax.Search(currentState, self.player.id) # random.choice(currentState.actionSet)
           # print("Turns to stalemate: ", self.game.turns_to_draw)
           # bestMove = random.choice(currentState.actionSet)
@@ -683,6 +695,7 @@ class AI(BaseAI):
           bestMove.piece.move(bestMove.to[0], bestMove.to[1])
         else:
           bestMove.piece.move(bestMove.to[0], bestMove.to[1], bestMove.promotedPiece)
+          self.promotedPreviousMove = True
         
         # print("End of my turn.")
         return True # to signify we are done with our turn.
