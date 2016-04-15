@@ -21,7 +21,7 @@ class TLHTQSIDABDLMM():
     self.PieceValue['b'] = 3
     self.PieceValue['r'] = 5
     self.PieceValue['q'] = 9
-    self.PieceValue['k'] = 100
+    self.PieceValue['k'] = 1
     self.TranspositionTable = {}
     self.HistoryTable = history
     
@@ -30,7 +30,7 @@ class TLHTQSIDABDLMM():
     # rootNode.printBoard()
     self.playerID = id
     self.startTime = time.time()
-    depthLimit = 3
+    depthLimit = 2
     bestFound = None
     bestU = -1*sys.maxsize
     for depth in range(0,depthLimit):
@@ -48,19 +48,20 @@ class TLHTQSIDABDLMM():
         
     return bestFound
     
-  def MiniMaxDecision(self, initialState, depth, alpha, beta):
+  def MiniMaxDecision(self, state, depth, alpha, beta):
   
-    terminalTest = self.TerminalTest(depth, initialState)
+    terminalTest = self.TerminalTest(depth, state)
     if terminalTest is not None:
       return terminalTest, -1*sys.maxsize
       
     v = -1*sys.maxsize
     prev = v
     a = None
-    sortedActions = self.SortActions(initialState.actionSet)
+    sortedActions = self.SortActions(state.actionSet)
     
-    for action in initialState.actionSet:
-      mm = self.MinValue(self.Result(initialState, action), depth-1, alpha, beta)
+    for action in state.actionSet:
+      mm = self.MinValue(self.Result(state, action), depth-1, alpha, beta)
+      self.UnapplyMove(state, action)
       v = max(v, mm)
       if v > prev:
         a = action
@@ -84,6 +85,7 @@ class TLHTQSIDABDLMM():
     
     for action in sortedActions:
       v = min(v, self.MaxValue(self.Result(state, action), depth-1, alpha, beta))
+      self.UnapplyMove(state, action)
       if v <= alpha:
         self.UpdateHistoryTable(action)
         return v
@@ -102,6 +104,7 @@ class TLHTQSIDABDLMM():
     
     for action in sortedActions:
       v = max(v, self.MinValue(self.Result(state, action), depth-1, alpha, beta))
+      self.UnapplyMove(state, action)
       if v >= beta:
         self.UpdateHistoryTable(action)
         return v
@@ -178,26 +181,17 @@ class TLHTQSIDABDLMM():
   # Returns a new state when given an action and a current state
   def Result(self, state, action):
   
-    
+    '''
     # Create a new board to simulate the next turn
     newBoard = []
     for x in range(0, 8):
       newBoard.append([])
       for y in range(0, 8):
-        newBoard[x].append(state.board[x][y])
+        newBoard[x].append(state.board[x][y])'''
     
-    '''
     # Apply the move to the board
-    state.previousPiece = state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])]
-    state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
-    state.board[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)'''
-
-    state.previousPiece = state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])]
-    newBoard[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
-    newBoard[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)
     
-    self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
-    newState = states.State(newBoard, self.MoveGenerator.playerAtPlay, action, self.TranspositionTable[state.stateID])
+    newState = self.ApplyMove(state, action)
     
     # Adjust the turns remaining to a draw
     if action.piece.type == self.MoveGenerator.PAWN or action.hasCaptured == True or action.notes == "e.p.":
@@ -205,8 +199,26 @@ class TLHTQSIDABDLMM():
     else:
       newState.turnsToDraw -= 1
     
-    newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newBoard, self.MoveGenerator.playerAtPlay)
+    # Generate all valid moves for the new state
+    newState.actionSet = self.MoveGenerator.GenerateAllValidMoves(newState.board, self.MoveGenerator.playerAtPlay)
     return newState
+    
+  def ApplyMove(self, state, action):
+  
+    # Save the piece at the position we are going to overwrite
+    state.previousPiece = state.board[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])]
+  
+    # Change this piece's square to an empty square
+    state.board[action.frm[1]-1][self.MoveGenerator.GetFileIndex(action.frm[0])] = '.'
+    
+    # Overwrite the resulting square to this piece
+    state.board[action.to[1]-1][self.MoveGenerator.GetFileIndex(action.to[0])] = self.MoveGenerator.GetPieceCode(action.piece)
+    
+    # Switch the player at play
+    self.MoveGenerator.SwitchPlayerAtPlay(state.playerID)
+    
+    # Generate and return the new state
+    return states.State(state.board, self.MoveGenerator.playerAtPlay, action, self.TranspositionTable[state.stateID])
     
   def UnapplyMove(self, state, action):
     # Unapply the move to the board
@@ -284,7 +296,7 @@ class TLHTQSIDABDLMM():
     u = 0
     
     # States which are further away from a draw are better
-    u += state.turnsToDraw
+    # u += state.turnsToDraw
          
     # For every piece on the board, add the piece's value to utility
     for x in range(0, len(state.board)):
