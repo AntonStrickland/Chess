@@ -30,7 +30,8 @@ class TLHTQSIDABDLMM():
     # rootNode.printBoard()
     self.playerID = id
     self.startTime = time.time()
-    depthLimit = 4
+    depthLimit = 2
+    quiet = 2
     bestFound = None
     bestU = -1*sys.maxsize
     for depth in range(0,depthLimit):
@@ -38,7 +39,7 @@ class TLHTQSIDABDLMM():
       self.totalNodes = 1
       alpha = -1*sys.maxsize
       beta = sys.maxsize
-      result,u = self.MiniMaxDecision(rootNode, depth, alpha, beta)
+      result,u = self.MiniMaxDecision(rootNode, depth, quiet, alpha, beta)
       
       if u > bestU:
         bestFound = result
@@ -48,19 +49,21 @@ class TLHTQSIDABDLMM():
         
     return bestFound
     
-  def MiniMaxDecision(self, state, depth, alpha, beta):
-  
-    #terminalTest = self.TerminalTest(depth, state)
-    #if terminalTest is not None:
-    #  return terminalTest, -1*sys.maxsize
-    
+  def MiniMaxDecision(self, state, depth, quiet, alpha, beta):
+    # If we run out of time, exit
+    if self.CheckTimeLimit() is True:
+      return -1*sys.maxsize
+      
     v = -1*sys.maxsize
     prev = v
     a = None
     sortedActions = self.SortActions(state.actionSet)
     
+    # print (quiet)
+    
     for action in sortedActions:
-      mm = self.MinValue(self.Result(state, action), depth-1, alpha, beta)
+        
+      mm = self.MinValue(self.Result(state, action), depth-1, quiet, alpha, beta)
       self.UnapplyMove(state, action)
       v = max(v, mm)
       if v > prev:
@@ -73,18 +76,38 @@ class TLHTQSIDABDLMM():
     self.UpdateHistoryTable(a)
     print(a, v)
     return a,v
+    
+    
+  def MinValue(self, state, depth, quiet, alpha, beta):
+    # If we run out of time, exit
+    if self.CheckTimeLimit() is True:
+      return -1*sys.maxsize
+      
+    # print ("Min", quiet)
+      
+    # If we have reached depth 0:
+    if depth <= 0:
+      # And this state is not quiet:
+      if state.actionTaken.hasCaptured is True:
+        # And we have not reached our quiet limit:
+        if quiet > 0:
+          # Subtract quiet limit and continue
+          print("QS!")
+          quiet -= 1
+        else:
+          return self.TerminalTest(depth, state)
 
-  def MinValue(self, state, depth, alpha, beta):
+    # Continue going deeper if Q search, otherwise do terminal test
     terminalTest = self.TerminalTest(depth, state)
-    if terminalTest is not None:
-      # print("util", state.actionTaken, terminalTest)
+    if terminalTest is not None and quiet <= 0:
       return terminalTest
       
     v = sys.maxsize
     sortedActions = self.SortActions(state.actionSet)
     
     for action in sortedActions:
-      v = min(v, self.MaxValue(self.Result(state, action), depth-1, alpha, beta))
+    
+      v = min(v, self.MaxValue(self.Result(state, action), depth-1, quiet, alpha, beta))
       self.UnapplyMove(state, action)
       if v <= alpha:
         self.UpdateHistoryTable(action)
@@ -93,17 +116,35 @@ class TLHTQSIDABDLMM():
     self.UpdateHistoryTable(action)
     return v
     
-  def MaxValue(self, state, depth, alpha, beta):
+  def MaxValue(self, state, depth, quiet, alpha, beta):
     
+    # If we run out of time, exit
+    if self.CheckTimeLimit() is True:
+      return -1*sys.maxsize
+    
+    # print ("Max", quiet)
+    
+    # If we have reached depth 0:
+    if depth <= 0:
+      # And this state is not quiet:
+      if state.actionTaken.hasCaptured is True:
+        # And we have not reached our quiet limit:
+        if quiet > 0:
+          # Subtract quiet limit and continue
+          print("QS!")
+          quiet -= 1
+        else:
+          return self.TerminalTest(depth, state)
+
     terminalTest = self.TerminalTest(depth, state)
     if terminalTest is not None:
       return terminalTest
-      
+
     v = -1*sys.maxsize
     sortedActions = self.SortActions(state.actionSet)
     
     for action in sortedActions:
-      v = max(v, self.MinValue(self.Result(state, action), depth-1, alpha, beta))
+      v = max(v, self.MinValue(self.Result(state, action), depth-1, quiet, alpha, beta))
       self.UnapplyMove(state, action)
       if v >= beta:
         self.UpdateHistoryTable(action)
@@ -125,13 +166,15 @@ class TLHTQSIDABDLMM():
   def SortActions(self, actionSet):
     return sorted(actionSet, key=lambda x: x.historyValue, reverse=True)
     
-  def TerminalTest(self, depth, state):
-  
+  def CheckTimeLimit(self):
     # Time limit reached?
     if time.time() - self.startTime >= self.timeLimit/1000000000:
       # print("time limit reached!", time.time() - self.startTime, self.timeLimit/1000000000)
-      return -1*sys.maxsize
-        
+      return True
+    return False
+    
+  def TerminalTest(self, depth, state):
+  
     if depth <= 0:
       self.TranspositionTable[state.stateID] = self.TranspositionTable.get(state.stateID, self.Utility(state))
       return self.TranspositionTable[state.stateID]
