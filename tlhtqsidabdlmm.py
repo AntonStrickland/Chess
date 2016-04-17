@@ -71,10 +71,10 @@ class TLHTQSIDABDLMM():
         prev = v
       elif mm == prev:
         # 50% chance to choose current action if same utility as the best
-        if random.random() > 1.0:
+        if random.random() > 0.5:
           a = action
     self.UpdateHistoryTable(a)
-    print(a, v)
+    # print(a, v)
     return a,v
     
     
@@ -92,7 +92,7 @@ class TLHTQSIDABDLMM():
         # And we have not reached our quiet limit:
         if quiet > 0:
           # Subtract quiet limit and continue
-          print("QS!")
+          # print("QS!")
           quiet -= 1
         else:
           return self.TerminalTest(depth, state)
@@ -131,7 +131,7 @@ class TLHTQSIDABDLMM():
         # And we have not reached our quiet limit:
         if quiet > 0:
           # Subtract quiet limit and continue
-          print("QS!")
+          # print("QS!")
           quiet -= 1
         else:
           return self.TerminalTest(depth, state)
@@ -346,12 +346,54 @@ class TLHTQSIDABDLMM():
  
     u = 0
     
-    # States which are further away from a draw are better
-    # u += state.turnsToDraw
+    #States which are further away from a draw are better
+    u += state.turnsToDraw
     
     if state.actionTaken is not None:
+      
       if state.actionTaken.hasCaptured is True:
         u += 90
+        
+      piece = self.MoveGenerator.GetPieceCode(state.actionTaken.piece)
+      y = self.MoveGenerator.GetFileIndex(state.actionTaken.to[0])
+      x = state.actionTaken.to[1]-1
+      isAttacked,attackingPiece = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece)
+      
+      # If this piece is under attack by a piece, then this is a worse move
+      if isAttacked == True:
+        u -= 4 * self.PieceValue[piece[0].lower()]
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.QUEEN:
+          u -= 20
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.ROOK:
+          u -= 10
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.BISHOP:
+          u -= 5
+        if attackingPiece == self.MoveGenerator.PAWN and state.actionTaken.piece == self.MoveGenerator.KNIGHT:
+          u -= 5
+          
+      # If this piece is protected by another team mate, then this is a better move
+      isProtected,reason = self.MoveGenerator.CheckIfUnderAttack(state.board, y, x, piece, True)
+      if isProtected:
+        u += 1
+        
+      # If this move captures a piece, then this is a better move depending on the type of piece captured
+      if state.actionTaken.hasCaptured == True:
+        captured = state.actionTaken.capturedPiece
+        if captured == self.MoveGenerator.KNIGHT:
+          captured = "NIGHT"
+        u += 4 * self.PieceValue[captured[0].lower()]
+        # print("Capture", u, 4 * self.PieceValue[captured[0].lower()])
+        
+      # Prefer moves that go to the center of the board early on
+      if len(self.MoveGenerator.game.moves) < 12:
+        if state.actionTaken.frm[1] == 1 or state.actionTaken.frm[1] == 8:
+          u -= 2
+        elif state.actionTaken.frm[1] == 2 or state.actionTaken.frm[1] == 7:
+          u -= 1
+    
+      # Try not to move the king unless necessary
+      if state.actionTaken.piece.type == self.MoveGenerator.KING:
+        u -= 5
          
     # For every piece on the board, add the piece's value to utility
     for x in range(0, len(state.board)):

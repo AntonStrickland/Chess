@@ -1,5 +1,5 @@
 #Name: Anton Strickland
-#CS5400 Game Project 3
+#CS5400 Game Project 4
 
 from joueur.base_ai import BaseAI
 import random
@@ -38,7 +38,7 @@ class AI(BaseAI):
         self.KING = "King"
         
         self.startTime = self.player.time_remaining
-        self.randomSeed = 9 # datetime.datetime.now()
+        self.randomSeed = datetime.datetime.now()
         
         
         self.promotedPreviousMove = False
@@ -683,8 +683,8 @@ class AI(BaseAI):
           if move.piece == bestMove.piece:
             bestMoveList.append(move)
         
-        #for move in bestMoveList:
-        #  print(move)
+        for move in bestMoveList:
+          print(move)
              
         if bestMove is None:
           print("There are no moves.")
